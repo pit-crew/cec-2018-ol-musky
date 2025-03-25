@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>CEC 2018 Mining for Ol' Musky Progress Tracker</title>
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+    <link rel="icon" href="favicon.ico" type="image/x-icon"/>
+
+    <meta charset="utf-8"/>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.1/Chart.bundle.min.js"></script>
+    <style>
+    h1, h2, h3, h4, h5, h6 {
+        color: #111;
+        font-family: 'Raleway', sans-serif;
+        font-weight: 600;
+        margin: 0 0 10px 0;
+        text-rendering: optimizelegibility;
+    }
+
+    <!-- #theBelt{background-image: url("/static/presentation.png"); -->
+    background-repeat: no-repeat;}
+
+    </style>
+    <script type="text/javascript">
+
+    var tname = "{{name}}";
+    var rows = 10;
+    var cols = 10;
+    var color = Chart.helpers.color;
+    var weeks = 550;
+
+    var colours = ["#911eb4","#3cb44b","#ffd8b1","#0082c8","#f58231",
+                "#e6194b", "#46f0f0","#f032e6","#d2f53c","#fabebe",
+                "#008080","#e6beff","#aa6e28","#fffac8","#800000",
+                "#aaffc3","#808000","#ffe119","#000080","#808080",
+                "#aaaaaa","#000000"]
+    var arr = window.location.href.split("/");
+    var prefix = arr[0] + "//" + arr[2];
+    var url = prefix + "/mcp/teams_detail?token=s9SdrpqoTzNULfctqEJg"
+
+    var scatterPlot;
+    var barChart;
+
+    $(document).ready(function() {
+        setInterval(function getFunction() {
+        url = url,
+        myBars = [];
+        myLabels = [];
+
+        $.ajax({
+            dataType: "json",
+            url: url,
+            success: function(result) {
+                var myDatasets = [];
+                var myBalances = [];
+                var myWeeks = [];
+                details = jQuery.parseJSON(JSON.stringify(result));
+
+                rows = details.rows;
+                cols = details.cols;
+                resp = details.teams;
+
+                clr  =  0;
+                for (k = 0; k < resp.length; ++k) {
+                    hublocations = []
+                    if (tname == "" || tname == resp[k].name) {
+                        j = 0;
+                        sectors = jQuery.parseJSON(resp[k].sector_ids);
+                        for (i = 0; i < sectors.length; ++i) {
+                            sid = sectors[i];
+                            x = sid % cols;
+                            y = Math.floor(sid / cols);
+                            hublocations[j] = { x: x, y: y};
+                            j += 1;
+                        }
+                    }
+
+                    myDatasets[k] = { "label": resp[k].name, 
+                        borderColor: "#888888",
+                        backgroundColor: colours[clr],
+                        "data": hublocations };
+
+                    myLabels[k] = resp[k].name;
+                    myBalances[k] = resp[k].balance;
+                    myWeeks[k] = resp[k].week;
+                    clr += 1;
+                }
+                if (scatterPlot != undefined) {
+                    scatterPlot.destroy();
+                }
+
+                if (barChart != undefined) {
+                    barChart.destroy();
+                }
+                updateProgress(myDatasets, myLabels, myBalances, myWeeks);
+                $('#timestamp').html("Last updated: " + (new Date()).toLocaleString('en-CA'));
+            }
+        });
+    }, 5000);
+    });
+
+
+    </script>
+    <script type="text/javascript">
+
+    Chart.defaults.global.elements.point.pointStyle = "rectRounded";
+    Chart.defaults.global.elements.point.radius = 12;
+    Chart.defaults.global.elements.point.pointStrokeColor = 12;
+
+    function updateProgress(mapdata, barLabels, barData, barWeeks) {
+        var ctxBelt = document.getElementById("theBelt").getContext('2d');
+        scatterPlot = new Chart(ctxBelt, {
+            type: 'scatter',
+            borderColor: "#000000",
+            data: {
+                datasets: mapdata,
+            },
+            options: {
+                animation: false,
+                responsive: true,
+                scaleShowLabels: false,
+                scales: {
+                    yAxes: [{
+                        display: true,
+                        ticks: {
+                            min: 0,
+                            max: rows,
+                            stepSize: 5,
+                            callback: function(dataLabel, index) {
+                                // Hide the tick labels
+                                return '';
+                            }
+                        }
+                    }],
+                    xAxes: [{
+                        display: true,
+                        ticks: {
+                            min: 0,
+                            max: cols,
+                            stepSize: 5,
+                            callback: function(dataLabel, index) {
+                                // Hide the tick labels
+                                return '';
+                            }
+                        }
+                    }]
+                }
+            }
+        });
+
+        var ctxSummary = document.getElementById("clients").getContext('2d');    
+        barChart = new Chart(ctxSummary, {
+            type: 'bar',
+            data: {
+                labels: barLabels,
+                datasets: [
+                    {   
+                        yAxisID: "A",
+                        backgroundColor: colours,
+                        data: barData,
+                    },
+                                        {
+                        yAxisID: "B",
+                        data: barWeeks,
+                    }
+                ]
+             },
+             options: {
+                animation: false,
+                responsive: false,
+                legend: { display: false },
+                title: {
+                    display: true,
+                },
+                scales: {
+                    xAxes: [{
+                        categorySpacing : 0
+                    }],
+                    yAxes: [{
+                    id: 'A',
+                    position: 'left',
+                    scaleLabel: {
+                        display: true,
+                        labelString: '$$$ Millions'
+                    },
+                    ticks: {
+                        suggestedMin: 0,
+                        callback: function(value, index, values) {
+                          if(parseInt(value) >= 1000){
+                            return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                          } else {
+                            return value;
+                          }
+                        }
+                    }
+                  }, {
+                    id: 'B',
+                    position: 'right',
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Weeks'
+                    },
+                    ticks: {
+                        suggestedMin: 0,
+                        suggestedMax: weeks,
+                    }
+
+                  }]
+                }
+             }
+        });
+    }
+
+    </script>
+</head>
+<body>
+<h1>Canadian Engineering Competition 2018</h1>
+<h3 style="color:grey;">Programming Challenge</h3>
+<h2>Mining Asteroids for Ol' Musky</h2>
+<button type="button" onclick="parent.location='/mcp/guide'" style="font-size:1em;">Guide</button>
+<center style="margin: auto 2em auto 2em;">
+    <canvas id="theBelt" width="1599" height="500"></canvas>
+    <canvas id="clients" width="1000" height="200"></canvas>
+</center>
+<div style="font-size:.75em;">
+    <p style="float:right;">SSL Certificate by <a href="https://letsencrypt.org/">Let's Encrypt</a></p>
+    <p style="float:left" id="timestamp">refresh 5 seconds ...</p>
+</div>
+</body>
+</html>

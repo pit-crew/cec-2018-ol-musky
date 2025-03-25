@@ -1,0 +1,51 @@
+@startuml
+
+title Mining Asteroids for Ol' Musky\n
+
+skinparam shadowing false
+
+skinparam note {
+	BorderColor #DarkSlateGrey
+}
+
+skinparam component {
+	Style uml2
+	BorderColor #DarkSlateGrey
+}
+
+:start;
+fork
+    while (time remaining?) is (>0)
+        :get prospect report;
+        :compute sites "scores"\n(weighted 8-sector averages);
+        :sort by score\n -> push to site_queue;
+        :sleep until next report;
+    endwhile (none)
+fork again
+    while (time remaining?) is (<72%)
+        :deploy new hubs from hub_queue\n(build work order done);
+        note right 
+            use sites from site_list
+            then remove
+        endnote
+        :move stale hubs from hub_queue;
+        note right 
+            use sites from site_list
+            then remove
+        endnote
+        :compute max # hubs to\nbuild using avaiable $$$;
+        note right
+            hold back reserve
+            for deploy+ship
+        end note
+        :build hubs\n(push to hub_queue);
+    endwhile(otherwise)
+fork again
+    while (week #?) is (< lifetime-shiptime)
+        :ship hubs from ship_queue;
+        :push all active hubs to ship_queue at\nand 18 weeks past price-rate is max;
+        :enqueue_1 stale hubs\n(out of ore);
+    endwhile(otherwise)
+end fork
+:ship all remaining hubs;
+@enduml

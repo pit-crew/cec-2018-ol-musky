@@ -1,0 +1,30 @@
+scenario_id: debug
+
+constants:
+  lifetime: 600 # weeks
+  ms_per_week: 200 # milliseconds / week
+  starting_capital: 175 # millions of dollars
+  mining_rate: 383 # tonnes/week
+  hub_capacity: 25000 # tonnes
+
+costs: # dollars and weeks
+  hub:
+    rate: 20
+    weeks: 5
+  deploy:
+    rate: 30
+    weeks: 17
+  ship:
+    rate: 1.5
+    weeks: 18
+  move:
+    rate: 10
+    weeks: 2
+
+belt:
+# cols = 3*rows
+# 7 % (cols*rows) > 0
+  cols: 120
+  rows: 40
+  prospecting_offset: 7
+  file: belt_map-dev.csv

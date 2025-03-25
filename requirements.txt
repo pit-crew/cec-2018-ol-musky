@@ -1,0 +1,12 @@
+Django==2.0
+enum-compat==0.0.2
+eventlet==0.21.0
+gevent==1.2.2
+greenlet==0.4.12
+python-engineio
+python-socketio
+pytz==2017.3
+PyYAML==3.12
+six==1.10.0
+yamlconf==0.2.3
+matplotlib==3.10.1

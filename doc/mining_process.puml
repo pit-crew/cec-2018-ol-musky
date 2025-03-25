@@ -1,0 +1,20 @@
+@startuml
+
+start
+
+while(status == 0)
+  :prospect_report;
+  :build_hubs;
+  :deploy_hubs;
+  :status_report;
+  if (hubs not producing ?) then (yes)
+     :move_hubs;
+  endif
+  if (hubs full?) then (yes)
+     :ship_ore;
+  endif
+endwhile
+
+stop
+
+@endum

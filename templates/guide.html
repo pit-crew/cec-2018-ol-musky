@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>CEC 2018 Guide</title>
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+    <link rel="icon" href="favicon.ico" type="image/x-icon"/>
+    <style>
+    h1, h2, h3, h4, h5, h6 {
+        color: #111;
+        font-family: 'Raleway', sans-serif;
+        font-weight: 600;
+        margin: 0 0 10px 0;
+        text-rendering: optimizelegibility;
+    }
+    table, tr, td {
+        text-align:top;
+    	border: none;
+    	border-spacing: 0;
+    	border-collapse: collapse;
+    	padding: 0px;
+	}
+    .tally {
+        text-align:right;
+        padding-right: 10px;
+    }
+    </style>
+</head>
+
+<body>
+
+<h1>Canadian Engineering Competition 2018</h1>
+<h3 style="color:grey;">Programming Challenge</h3>
+<h2>Mining Asteroids for Ol' Musky</h2>
+
+<p>
+    Quick Nav: <a href="#rules">Rules</a> <a href="#submission">Submission</a> <a href="#api">API</a> <a
+        href="#gettingstarted">Getting Started</a> <a
+        href="#judging-criteria">Judging Criteria</a> <a href="#statuscodes">Status Codes</a> <a href="#appendix">Appendix</a>
+</p>
+<button type="button" onclick="parent.location='/mcp/'" style="font-size:1em;">Progress Monitor</button>
+
+<div class="main-div">
+
+    <h2>Competition:</h2>
+    <p style="font-size: 1.2em">Your mandate is to develop an autonomous asteroid mining system (AI) that makes the most
+        money with the fewest resources for the Ol' Musky Mining Company.</p>
+
+    <p>Starting with ${{starting_capital}},000,000 of capital, your AI will interface with Ol' Musky's <strong>Master
+        Control Program (MCP)</strong> which will carry out your instructions and queries for <strong>all</strong>
+        phases of your mining operation. Your AI will be responsible for building and deploying robotic mining hubs in
+        the asteroid belt between Mars and Jupiter and shipping the ore back to Earth. Your task is basically
+        engineering a Supply Chain Management AI. Easy, eh?</p>
+
+    <h4>Sample distribution of ore deposits (two ore types blue: X, red: Y)</h4>
+    <img src="/static/belt-sample.png" width=100%/>
+
+    <br>
+    <br>
+    <h3>Operations (What your AI will do)</h3>
+    <p>
+        <strong>Your AI will be completely autonomous</strong>; i.e. once initiated, it will run entirely on its
+        own without input or intervention until the time limit has been reached.
+        Time is measured by the MCP in weeks where 1 MCP week = {{ms_per_week}}ms of real time.
+        Each run is {{total_years}} MCP years which is about {{total_minutes}} minutes of real time.
+        During development, you may run your AI as often as you require.</p>
+
+    <p><i>During your presentation, your AI will run only once</i>.</p>
+
+    <h3>Interfacing with the MCP (How your AI will work)</h3>
+    <p>All communication with the MCP is done through its RESTful API. Your code can be written in any compiled or
+        interpreted language or script. There are some language docs for HTTP requests in the <a href="#language_refs">Language reference</a>.
+    </p>
+    <ul>
+        <li>All responses from the MCP are in JSON format (structures in <a href="#api">API Specification</a>)</li>
+        <li>All MCP instructions cost time and money (see <a href="#costs">Costs</a>) but the reports are <b>free</b>
+        </li>
+    </ul>
+
+    <h3>MCP API Overview (The tools your AI will use)</h3>
+    <ul>
+        <li><b>Startup (Initialization)</b>
+            <ul>
+                <li>The <a href="#startup"><code>/mcp/startup</code></a> API call bootstraps your AI's profile on the
+                    MCP and cleans out <strong>all</strong> historical data and starts the <strong>clock</strong>.
+                </li>
+                <li>This <b>must</b> be the first call your AI makes for each run.</li>
+                <li>The MCP's response from <a href="#startup"><code>/mcp/startup</code></a> is a status report (see <a
+                        href="#status_report"><code>/mcp/status_report</code></a>)<br><br></li>
+            </ul>
+        </li>
+
+        <li><b>Parameters (MCP Constants)</b>
+            <ul>
+                <li>The <a href="#parameters"><code>/mcp/parameters</code></a> API simply dumps all the constants used
+                    by the MCP. These parameters <b>may</b> change slightly during development so your AI should not
+                    treat them as hard-coded. You will be clearly notified of any changes. However, for your
+                    presentation, the parameters will be significantly different.
+                    <ul>
+                        <li>Competition lifetime (in weeks)</li>
+                        <li>Asteroid belt segment size in rows and columns</li>
+                        <li>Hub capacity in tonnes</li>
+                        <li>Rate of mining in tonnes/per bot/per week</li>
+                        <li>Real time vs MCP time factor in ms/week</li>
+                        <li>Costs of all actions in dollars and time (see <a href="#costs">Costs</a>)<br><br></li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li><b>Prospecting Report</b> (Exploration)
+            <ul>
+                <li>Using the <a href="#prospect_report"><code>/mcp/prospect_report</code></a> API function, your AI
+                    will
+                    get data from on-going geological surveys and test bore-holes in the asteroid belt. The report is a
+                    list
+                    of sectors, the ore type found and an estimate of size of ore deposit in each sector. However, each
+                    report contains only a subset of the total sectors
+                </li>
+                <li>A new report is available every {{preport_freq}} MCP weeks progressively covering more of the
+                    belt.
+                </li>
+            </ul>
+
+            <h4>Example of one prospect report - a diagonal exploratory "pass"</h4>
+            <img src="/static/prospect_report-0.png" width=100%/>
+            <h4>Each colour represents a separate prospecting report pass (7 in all)</h4>
+            <img src="/static/prospect_report.png" width=100%/>
+            <br/>
+        </li>
+        <li><b>Build Hubs, Deploy Hubs and Move Hubs</b> (Development)
+            <ul>
+                <li>Construct hubs using the <a href="#build_hubs"><code>/mcp/build_hubs</code></a> and deploy them to
+                    the
+                    asteroid belt using <a href="#deploy_hubs"><code>/mcp/deploy_hubs</code></a> APIs.
+                </li>
+                <li><i>Note: hubs automatically distribute their mining bots and initiate the ore accumulation</i></li>
+                <li>If a hub runs out of ore to mine, your AI can move the hub using the <a href="#move_hubs"><code>/mcp/move_hubs</code></a>
+                    API function.
+                </li>
+                <li><b>Important: Each of these actions is <b>scheduled</b> by the MCP in a <strong>work order</strong>
+                    that
+                    takes time to complete. See <a href="#costs">Costs</a></b>.
+                </li>
+                <li>A list of all of pending work orders is included in the <a href="#status_report"><code>/mcp/status_report</code></a><br/><br/>
+                </li>
+
+            </ul>
+        </li>
+        <li><b>Status Report</b> (Active mining/ore extraction)
+            <ul>
+                <li>The <a href="#status_report"><code>/mcp/status_report</code></a> provides a snapshot of your
+                    operation including your bank balance at the time of the report.
+
+                    <ul>
+                        <li>Team attributes</li>
+                        <li>Financial
+                            (see below)
+                        </li>
+                        <li>List of hubs, their sector IDs, the space remaining in the hub and amount of accumulated
+                            ore
+                        </li>
+                        <li>List of outstanding work-orders</li>
+                    </ul>
+                </li>
+            </ul>
+            <br>
+        </li>
+        <li><b>Get Ledger</b> (Financials)
+            <ul>
+                <li>The <a href="#get_ledger"><code>/mcp/get_ledger</code></a> is exaclty that - your accounting ledger.
+                    It's <b>not</b> something your AI should be checking frequently because it can get rather large as
+                    time
+                    goes on.
+                    <table>
+                        <tr>
+                            <th>week</th>
+                            <th>item</th>
+                            <th>debit</th>
+                            <th>credit</th>
+                            <th>balance</th>
+                        </tr>
+                        <tr>
+                            <td>0</td>
+                            <td>startup</td>
+                            <td>0</td>
+                            <td>150</td>
+                            <td>150</td>
+                        </tr>
+                        <tr>
+                            <td>1</td>
+                            <td>build hubs</td>
+                            <td>45</td>
+                            <td>0</td>
+                            <td>105</td>
+                        </tr>
+                        <tr>
+                            <td>20</td>
+                            <td>deploy hubs</td>
+                            <td>66</td>
+                            <td>0</td>
+                            <td>39</td>
+                        </tr>
+                    </table>
+                    <br/><br/></li>
+            </ul>
+        </li>
+        <li><b>Ship Ore</b> (Production)
+            <ul>
+                <li>Ship ore from the hubs back to Earth as hubs fill up</li>
+                <li>The <a href="#market"><code>/mcp/market_report</code></a> has the current ore prices</li>
+                <li><strong>Note:</strong> The MCP schedules rocket trips between Earth and the belt as part of the work
+                    order<br/><br/></li>
+            </ul>
+        </li>
+        <li><b id="costs">Costs</b>
+            <br>
+            <table>
+                <tr>
+                    <th>Action</th>
+                    <th>Cost (x millions)</th>
+                    <th>Time (weeks)</th>
+                </tr>
+                <tr>
+                    <td>Build a Hub</td>
+                    <td>${{build_rate}} per hub</td>
+                    <td>{{build_weeks}}</td>
+                </tr>
+                <tr>
+                    <td>Deploy a Hub</td>
+                    <td>${{deploy_rate}} per hub</td>
+                    <td>{{deploy_weeks}}</td>
+                </tr>
+                <tr>
+                    <td>Move a Hub</td>
+                    <td>${{move_rate}} per hub</td>
+                    <td>{{move_weeks}}</td>
+                </tr>
+                <tr>
+                    <td>Ship Ore</td>
+                    <td>${{ship_rate}} per 1000 tonnes</td>
+                    <td>{{ship_weeks}}</td>
+                </tr>
+            </table>
+            <br>
+        </li>
+        <li><b id="revenue">Revenue</b>
+            <ul>
+                <li>On Earth, the minerals are automatically extracted from the ore and sold (revenue) at the <i>market
+                    value upon arrival.</i></li>
+                <li>The revenue from ore sales is deposited directly into your account and is reflected in the ledger
+                </li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3 id="constraints">Constraints</h3>
+    <ul>
+        <li>each hub has 8 robotic miners (bots)</li>
+        <li>bots may only mine the 8 sectors adjacent to their parent hub (see <a href="#hubplacement">Example Hub
+            Placement</a>)
+        </li>
+        <li>bots may not mine the sector on which the hub is deployed</li>
+        <li>bots cannot simultaneously mine the same sectors</li>
+        <li>mining stops when a hub is full, the ore is depleted or when a hub is being deployed or moved</li>
+    </ul>
+
+    <br>
+    <hr>
+    <h2 id="tips">Tips:</h2>
+    <ul>
+        <li style="color:blue;">To avoid disqualification through inadvertently DDoSing the server, we recommend your AI
+            checks the status of your <b>orders</b> (in the <a href="#status_report"><code>/mcp/status_report</code></a>)
+            with a reasonable frequency since the report is updated only once per MCP week ({{ms_per_week}}ms).
+        </li>
+        <li style="color:blue;">Related to DDoS, also keep an eye on how much data you transmit to the MPC - it doesn't
+            have unlimited bandwidth
+        </li>
+        <li style="color:blue;">Keep in mind your goal is to <b>earn the most money</b>, so partition your development
+            tasks wisely.
+        </li>
+        <li style="color:blue;">Be aware that timing won't be exact. Code takes time to execute, data takes time to
+            transmit and
+            networks have contention.
+        </li>
+        <li style="color:blue;">Before you ask for help with the MCP, check for "garbage in; garbage out" first.</li>
+
+        <li style="color:blue;">This is a complex problem so to <b>save valuable presentation time</b> we recommend
+            omitting the problem description from your presentation
+        </li>
+    </ul>
+
+    <h2 id="rules">Rules:</h2>
+    <p>
+        As always, violating any rules will result in immediate disqualification
+    </p>
+    <ul>
+        <li>Your security api token may be transmitted ONLY to the MCP host URL and must originate from the hotel
+            WiFi.
+        </li>
+        <li>NO HACKING the MCP server.</li>
+        <li>NO DDoS attacks on the MCP server or other competitors.</li>
+    </ul>
+
+    <h3 id="submission">Submission</h3>
+    <ul>
+        <li>The required output from your AI is a time-stamped log of the HTTP requests transmitted in the format:
+            <i>YYYY-MM-DD HH:MM:SS URI</i>
+        </li>
+        <li>e.g.<br>
+            <pre>
+2018-02-09 21:34:13 https://www.cec-2017.ca/mcp/startup?token=71a653928dc1152537d002cd1349f0d4
+</pre>
+        <li>All teams must submit their final log file and code in a zip file emailed to dmarchese@ryerson.ca no later
+            than <b>6:01pm EST on March 9, 2018</b>. Late submissions will not be accepted.
+        </li>
+    </ul>
+
+    <h3 id="gettingstarted">Getting Started:</h3>
+    <ol>
+        <li>Obtain a security API access token from the competition coordinator</li>
+        <li>Start coding - the very first API request your code should make is <a
+                href="#startup"><code>/mcp/startup</code></a></li>
+    </ol>
+
+    <h3>Scoring</h3>
+    Objective scoring is based solely on profit (Revenues - Expenses)
+    <br>
+    <br>
+    <h3 id="judging-criteria">Judging Criteria:</h3>
+    <table>
+        <tr>
+            <td>Presentation</td>
+            <td>
+                <ul>
+                    <li>Design process</li>
+                    <li>Design justification</li>
+                    <li>Critique of the design</li>
+                    <li>Presentation delivery</li>
+                </ul>
+            </td>
+            <td class="tally">20%</td>
+        </tr>
+        <tr>
+            <td>Strategy/Algorithm</td>
+            <td>
+                <ul>
+                    <li>Simplicity</li>
+                    <li>Innovation</li>
+                    <li>Ability to achieve desired outcome</li>
+                </ul>
+            </td>
+            <td class="tally">40%</td>
+        </tr>
+        <tr>
+            <td>Code</td>
+            <td>
+                <ul>
+                    <li>Structure</li>
+                    <li>Readability</li>
+                    <li>Code efficiency</li>
+                </ul>
+            </td>
+            <td class="tally">30%</td>
+        </tr>
+        <tr>
+            <td>Resource Management</td>
+            <td>
+                <ul>
+                    <li>Attention to these details:
+                        <ul>
+                            <li>Memory usage efficiency</li>
+                            <li>Program's CPU usage</li>
+                        </ul>
+                    </li>
+                </ul>
+            </td>
+            <td class="tally">10%</td>
+        </tr>
+        <tr>
+            <th colspan="2">Total</th>
+            <th class="tally">100%</th>
+        </tr>
+    </table>
+    <br>
+
+    <hr>
+    <br>
+    <h2 id="appendix">Appendix</h2>
+
+    <h3 id="api">API Specification</h3>
+    <p>All RESTful calls to the MCP must be HTTP GET and use this format:
+    <pre>
+https://7066414.pythonanywhere.com/mcp/[api]?token=[security api token]
+			</pre>
+    All responses from the MCP will be in standard JSON format.
+    <br/>
+
+    <ul>
+        <li><h4 id="startup">Startup:</h4>
+            <code>GET /mcp/startup?token=[api_token]</code>
+            <p><i>Example Response:</i></p>
+            <div class="json-div">
+			<pre>{"status_report": {
+    "team": {
+        "token": "71a653928dc1152537d002cd1349f0d4",
+        "name": "testgremlins",
+        "week": 20,
+        "start_time": "2018-02-10 07:53:16.279185+00:00",
+        "balance": 100
+    },
+    "ledger": [
+        {
+            "week": 0,
+            "item": "startup",
+            "credit": 150.0,
+            "debit": 0.0
+        }
+    ],
+    "hubs": {},
+    "orders": []
+},"status": 0,"description": ""}</pre>
+            </div>
+        </li>
+
+        <li><h4 id="status_report">Status Report:</h4>
+            <code>GET /mcp/status_report?token=[api_token]</code>
+            <p>The most important of all requests, it includes your team's:</p>
+            <ul>
+                <li>Attributes including the all important <strong>balance</strong></li>
+                <li>List of built/deployed hubs.</li>
+                <li>List of pending MCP orders.</li>
+                <li>Key info about each hub:
+                    <ul>
+                        <li>sector_id: when -1, it means hub has not been deployed</li>
+                        <li>amt: the amount of accumulated ore for each ore type collected</li>
+                        <li>space_remaining: easy way to determine how "full" the hub is (%)</li>
+                        <li>active: when True, hub is actively mining - False only while deploying and moving the hub
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+
+            <p><i>Example Response:</i></p>
+            <div class="json-div">
+			<pre>{"status_report": {
+    "team": {
+        "token": "71a653928dc1152537d002cd1349f0d4",
+        "name": "testgremlins",
+        "week": 20,
+        "start_time": "2018-02-10 07:53:16.279185+00:00",
+        "balance": 100
+    },
+    "hubs": {
+        "A": {
+            "hub_id": "A",
+            "start_time": "2018-02-10 07:53:19.469587+00:00",
+            "sector_id": -1,
+            "amt": { "X": 12726, "Y": 324 },
+            "space_remaining": 100,
+            "active": false
+        }
+    },
+    "orders": [
+        {
+            "week": 12,
+            "action": "deliver_hubs",
+            "hub_list": "A",
+            "sector_id_list": "",
+            "ore_load": 0,
+            "complete": false,
+            "insured": false,
+            "pirated": false
+        },
+        {
+            "week": 32,
+            "action": "relocate_hubs",
+            "hub_list": "A",
+            "sector_id_list": "0",
+            "ore_load": 0,
+            "complete": false
+            "insured": false,
+            "pirated": false
+        }
+    ]
+},"status": 0,  "description": ""}
+			</pre>
+            </div>
+        </li>
+
+        <li><h4 id="get_ledger">Get Ledger:</h4>
+            <code>GET /mcp/get_ledger?token=[api_token]</code>
+            <p>Your accounting ledger.</p>
+
+            <p><i>Example Response:</i></p>
+            <div class="json-div">
+			<pre>{"ledger": {
+    "ledger": [
+        {
+            "week": 0,
+            "item": "startup",
+            "credit": 150.0,
+            "debit": 0.0
+        },
+        {
+            "week": 7,
+            "item": "build hubs",
+            "credit": 0.0,
+            "debit": 20.0
+        },
+        {
+            "week": 15,
+            "item": "deploy hubs",
+            "credit": 0.0,
+            "debit": 30.0
+        }
+    ],
+			</pre>
+            </div>
+        </li>
+
+        <li><h4 id="parameters">Parameters</h4>
+            <code>GET /mcp/parameters?token=[api_token]</code>
+            <p>These are the problem scenario's constants. The costs are <strong>per hub</strong> except for <strong>ship</strong>,
+                which is cost <strong>per 1000 tonnes</strong> of ore.<br><i>Example Response:</i></p>
+
+            <div class="json-div">
+			<pre>{"parameters":{
+    "lifetime": {{lifetime}},
+    "rows": {{rows}},
+    "cols": {{cols}},
+    "hub_capacity": {{hub_capacity}},
+    "mining_rate": {{mining_rate}},
+    "ms_per_week": {{ms_per_week}},
+    "costs": {
+        "build": {
+            "item": "hub",
+            "weeks": {{build_weeks}},
+            "rate": {{build_rate}}
+        },
+        "deploy": {
+            "item": "deploy",
+            "weeks": {{deploy_weeks}},
+            "rate": {{deploy_rate}}
+        },
+        "ship": {
+            "item": "ship",
+            "weeks": {{ship_weeks}},
+            "rate": {{ship_rate}}
+        },
+        "move": {
+            "item": "move",
+            "weeks": {{move_weeks}},
+            "rate": {{move_rate}}
+        }
+    }
+},"status":0, "description":"ok"}</pre>
+            </div>
+        </li>
+
+        <li><h4 id="prospect_report">Prospecting Report</h4>
+            <code>GET /mcp/prospect_report?token=[api_token]</code>
+            <p>Each element of the prospect report indicates the sector ID, the ore type and the estimated deposit size.<br>
+                Note: This report only shows new estimates; it does not repeat previous data. They are published every
+                {{preport_freq}} weeks.</p>
+
+            <p>Format <code>[sector_id, ore_type, estimated_tonnes]</code></p>
+
+            <p><i>Example Response: (zero-based indexing)</i></p>
+            <div class="json-div">
+		<pre>{"prospect_report":{
+    "report": [
+        [0,  "X", 3352 ],
+        [7,  "X", 5184 ],
+        [14, "X", 0 ],
+        [21, "Y", 0 ],
+        [28, "X", 0 ],
+        [35, "X", 0 ],
+        [42, "X", 0 ],
+            .
+            .
+            .
+        [2681, "Y", 90249 ],
+        [2688, "X", 71194 ],
+        [2695, "X", 5584 ]
+    ]
+},"status":0, "description":""}
+</pre>
+            </div>
+        </li>
+
+        <li><h4 id="market">Market Report</h4>
+            <code>GET /mcp/market_report?token=[api_token]</code>
+            <p>Ore prices change weekly</p>
+            <p><i>Example Response:</i></p>
+            <div class="json-div">
+		<pre>{"market_report": {
+    "week" : 42,
+    "prices": {"X": 4.32, "Y": 9.47},
+    "status": 0
+}, "status": 0, "description": ""}
+</pre>
+            </div>
+        </li>
+
+        <li><h4 id="build_hubs">Build Hubs</h4>
+            <p>Hubs can be named anything, but by keeping the names short, you're less likely to overflow the HTTP
+                querystring</p>
+            <code>GET /mcp/build_hubs?token=[api_token]&amp;hubs=[H0,H1,..Hn]</code>
+            <p><i>Example Response:</i></p>
+            <div class="json-div">
+			<pre>{"build_hubs": {
+    "hubs_located": 3
+},"status": 0,  "description": "" }
+</pre>
+            </div>
+        </li>
+
+        <li><h4 id="deploy_hubs">Deploy Hubs</h4>
+            <p>The number of sector IDs must match the number of hub IDs. Sector IDs must be numeric - as they are in
+                the prospect report</p>
+            <code>GET /mcp/deploy_hubs?token=[api_token]&amp;hubs=[H0,H1,...Hn]&amp;sector_ids=[s0,s2,...,sn]</code>
+            <p><i>Example Response:</i></p>
+            <div class="json-div">
+			<pre>{"deploy_hubs": {
+    "hubs_located": 3
+},"status": 0,  "description": ""}
+</pre>
+            </div>
+        </li>
+
+        <li><h4 id="move_hubs">Move Hubs</h4>
+            <code>GET /mcp/move_hubs?token=[api_token]&amp;hubs=[H0,H1,...Hn]&amp;sector_ids=[s0,s2,...,sn]</code>
+            <p><i>Example Response:</i></p>
+            <div class="json-div">
+			<pre>{"move_hubs": {
+    "hubs_located": 2
+},"status": 0,  "description": ""}
+</pre>
+            </div>
+        </li>
+
+        <li><h4>Ship Ore</h4>
+            <code>GET /mcp/ship_ore?token=[api_token]&amp;hubs=[H0,H1,...Hn][&amp;insured=true]</code>
+            <p>If you're concerned with the risks of shipping, appending the optional <b>insured-true</b> flag will buy
+                your shipment an armed escort for a flat fee of 20% of the sale price when it gets to Earth
+                successfully.</p>
+            <p><i>Example Response:</i></p>
+            <div class="json-div">
+			<pre>{"ship_ore": {
+    "hubs_dumped": 1,
+    "ore": {'X': 22980, 'Y': 3830}},
+    "price": 3.4
+},"status": 0, "description": ""}
+</pre>
+            </div>
+        </li>
+    </ul>
+
+    <h3 id="language_refs">Language reference for HTTP requests</h3>
+    <p>If this is your first time making get requests; checkout the following language docs:</p>
+    <ul>
+        <li><a href="https://github.com/httprb/http">Ruby</a></li>
+        <li><a href="http://docs.python-requests.org/en/master/">Python</a></li>
+        <li><a href="https://hc.apache.org/httpcomponents-client-ga/index.html">Java</a></li>
+    </ul>
+    <h3 id="hubplacement">Example Hub placement showing adjacent sectors (Cartesian co-ordinates)</h3>
+    <img src="/static/example-graphic.gif" width="600">
+
+    <p>
+    <h3 id="statuscodes">MCP Response Status Codes</h3>
+    <table>
+        <tr>
+            <th>Action</th>
+            <th>Code</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td>validation</td>
+            <td>1000</td>
+            <td>token must be 32 or fewer alpha-numerics</td>
+        </tr>
+        <tr>
+            <td>validation</td>
+            <td>1001</td>
+            <td>token required - see competition coordinator</td>
+        </tr>
+        <tr>
+            <td>validation</td>
+            <td>1100</td>
+            <td>no team for token &lt;token&gt;</td>
+        </tr>
+        <tr>
+            <td>validation</td>
+            <td>1201</td>
+            <td>name must be 32 or fewer alpha-numerics</td>
+        </tr>
+        <tr>
+            <td>startup</td>
+            <td>2100</td>
+            <td>no team found for token=&lt;token&gt;</td>
+        </tr>
+        <tr>
+            <td>build_hubs</td>
+            <td>2301</td>
+            <td>not enough money</td>
+        </tr>
+        <tr>
+            <td>deploy/move</td>
+            <td>2401</td>
+            <td>hub list and sector_id list need to be the same length &lt;length difference&gt;</td>
+        </tr>
+        <tr>
+            <td>deploy/move</td>
+            <td>2402</td>
+            <td>some hubs requested do not exist</td>
+        </tr>
+        <tr>
+            <td>deploy/move</td>
+            <td>2403</td>
+            <td>hubs: &lt;hub list&gt; currently being deployed</td>
+        </tr>
+        <tr>
+            <td>deploy/move</td>
+            <td>2405</td>
+            <td>hubs must be deployed to separate sectors</td>
+        </tr>
+        <tr>
+            <td>deploy/move</td>
+            <td>2406</td>
+            <td>mining bots must use separate sectors</td>
+        </tr>
+        <tr>
+            <td>deploy/move</td>
+            <td>2407</td>
+            <td>unable to deploy to occupied sectors: &lt;guilty sector ID&gt;</td>
+        </tr>
+        <tr>
+            <td>deploy/move</td>
+            <td>2408</td>
+            <td>hubs must be deployed before being moved</td>
+        </tr>
+        <tr>
+            <td>deploy/move</td>
+            <td>2409</td>
+            <td>not enough money</td>
+        </tr>
+        <tr>
+            <td>ship_ore</td>
+            <td>2501</td>
+            <td>no hubs requested</td>
+        </tr>
+        <tr>
+            <td>ship_ore</td>
+            <td>2502</td>
+            <td>no ore to ship from hub &lt;hub&gt;</td>
+        </tr>
+        <tr>
+            <td>ship_ore</td>
+            <td>2503</td>
+            <td>not enough money</td>
+        </tr>
+    </table>
+</div>
+<div style="font-size:.75em;">
+    <p style="float:left;">SSL Certificate by <a href="https://letsencrypt.org/">Let's Encrypt</a></p>
+</div>
+</body>
+</html>

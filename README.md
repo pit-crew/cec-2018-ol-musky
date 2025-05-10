@@ -1,5 +1,5 @@
 >Mar 2025 Preamble: 
->I wrote this 7 years ago for the 2018 CEC hosted by the Toronto Metropolitan University (formerly Ryerson University).  This app **doesn't work in its current state**. It was deployed to [pythonanywhere](https://www.pythonanywhere.com) for the competition, but I'm working on getting it running on a local Django. 
+>I wrote thisyears ago for the 2018 CEC hosted by the Toronto Metropolitan University (formerly Ryerson University).  This app **doesn't work in its current state**. It was deployed to [pythonanywhere](https://www.pythonanywhere.com) for the competition, but I'm working on getting it running on a local Django. 
 >
 >Two things are missing (AFAIK) are:
 >1. the _live status_ page which displayed where all the teams's hubs in the asteroid belt and their current income during the competition.

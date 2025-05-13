@@ -1,6 +1,6 @@
 # Helper for determining sectors adjacent to a given sector
 #
-SECTOR_ADJACENCY = [(i,j) for i in (-1,0,1) for j in (-1,0,1) if not (i == j == 0)]
+SECTOR_ADJACENCY = [(i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if not (i == j == 0)]
 
 # Field name constants
 #
@@ -28,8 +28,7 @@ PARAM = None
 COST = None
 
 try:
-	PARAM = Parameter.objects.get(pk="debug") # default scenario
-	COST = {cost.item: cost for cost in PARAM.cost_set.all()}
+    PARAM = Parameter.objects.get(pk="debug")  # default scenario
+    COST = {cost.item: cost for cost in PARAM.cost_set.all()}
 except:
-	raise()
-
+    raise ()

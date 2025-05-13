@@ -6,7 +6,7 @@ import pytz
 from django.db import models
 
 
-# Parameter set for entire game 
+# Parameter set for entire game
 #
 class Parameter(models.Model):
     scenario_id = models.CharField(max_length=32, primary_key=True)
@@ -21,9 +21,15 @@ class Parameter(models.Model):
 
     def as_dict(self):
         costs = {cost.item: cost.as_dict() for cost in self.cost_set.all()}
-        d = {"lifetime": self.lifetime, "rows": self.rows, "cols": self.cols,
-             "hub_capacity": self.hub_capacity, "mining_rate": self.mining_rate, "ms_per_week": self.ms_per_week,
-             "costs": costs}
+        d = {
+            "lifetime": self.lifetime,
+            "rows": self.rows,
+            "cols": self.cols,
+            "hub_capacity": self.hub_capacity,
+            "mining_rate": self.mining_rate,
+            "ms_per_week": self.ms_per_week,
+            "costs": costs,
+        }
         return d
 
 
@@ -50,8 +56,13 @@ class Team(models.Model):
     balance = models.IntegerField()
 
     def as_dict(self):
-        d = {"token": self.token, "name": self.name, "week": self.week, "start_time": str(self.start_time),
-             "balance": self.balance}
+        d = {
+            "token": self.token,
+            "name": self.name,
+            "week": self.week,
+            "start_time": str(self.start_time),
+            "balance": self.balance,
+        }
         return d
 
 
@@ -65,7 +76,12 @@ class Ledger(models.Model):
     debit = models.FloatField()
 
     def as_dict(self):
-        d = {"week": self.week, "item": self.item, "credit": self.credit, "debit": self.debit}
+        d = {
+            "week": self.week,
+            "item": self.item,
+            "credit": self.credit,
+            "debit": self.debit,
+        }
         return d
 
 
@@ -73,7 +89,7 @@ class Ledger(models.Model):
 #
 class Hub(models.Model):
     class Meta:
-        unique_together = (('team', 'hub_id'),)
+        unique_together = (("team", "hub_id"),)
 
     team = models.ForeignKey(Team, default=None, on_delete=models.CASCADE)
     hub_id = models.CharField(max_length=8)
@@ -122,8 +138,14 @@ class Hub(models.Model):
         return amt_to_unload
 
     def as_dict(self):
-        d = {"hub_id": self.hub_id, "start_time": str(self.start_time), "sector_id": self.sector_id,
-             "amt": self.amt, "space_remaining": self.space_remaining, "active": self.active}
+        d = {
+            "hub_id": self.hub_id,
+            "start_time": str(self.start_time),
+            "sector_id": self.sector_id,
+            "amt": self.amt,
+            "space_remaining": self.space_remaining,
+            "active": self.active,
+        }
 
         return d
 
@@ -132,7 +154,7 @@ class Hub(models.Model):
 #
 class Market(models.Model):
     class Meta:
-        unique_together = (("week", "ore_id"))
+        unique_together = ("week", "ore_id")
 
     week = models.IntegerField()
     ore_id = models.CharField(max_length=8)
@@ -151,7 +173,7 @@ class Belt(models.Model):
 #
 class Site(models.Model):
     class Meta:
-        unique_together = (("team", "sector_id"))
+        unique_together = ("team", "sector_id")
 
     team = models.ForeignKey(Team, default=None, on_delete=models.CASCADE)
     sector_id = models.IntegerField()
@@ -159,7 +181,11 @@ class Site(models.Model):
     deposit_amt = models.IntegerField()
 
     def as_dict(self):
-        d = {"sector_id": self.sector_id, "ore_id": self.ore_id, "deposit_amt": self.deposit_amt}
+        d = {
+            "sector_id": self.sector_id,
+            "ore_id": self.ore_id,
+            "deposit_amt": self.deposit_amt,
+        }
         return d
 
 
@@ -175,8 +201,14 @@ class Order(models.Model):
     pirated = models.BooleanField(default=False)
 
     def as_dict(self):
-        d = {"week": self.week, "action": self.action, "hub_list": self.hub_list,
-             "sector_id_list": self.sector_id_list, "ore_load": self.ore_load, "complete": self.complete}
+        d = {
+            "week": self.week,
+            "action": self.action,
+            "hub_list": self.hub_list,
+            "sector_id_list": self.sector_id_list,
+            "ore_load": self.ore_load,
+            "complete": self.complete,
+        }
         return d
 
 

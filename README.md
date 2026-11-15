@@ -1,12 +1,3 @@
->Mar 2025 Preamble: 
->I wrote this years ago for the 2018 CEC hosted by the Toronto Metropolitan University (formerly Ryerson University).  This app **doesn't work in its current state**. It was deployed to [pythonanywhere](https://www.pythonanywhere.com) for the competition, but I'm working on getting it running on a local Django. 
->
->Two things are missing (AFAIK) are:
->1. the _live status_ page which displayed where all the teams's hubs in the asteroid belt and their current income during the competition.
->2. the deployment instructions I wrote in great detail.
->
->The name Sid Meier shows up here and there in code because it was in the original name, but, due to licensing, we had to rename it.  Ryerson engineering students will recognize Ol' Musky.
-
 ## Redevelopment (2026)
 
 The MCP is being rebuilt on FastAPI, SQLAlchemy and SQLite in `src/ol_musky/`. The Django code (`mcp/`, `admin/`, `templates/`, `src/urls.py`, `src/wsgi.py`) stays in the repository as the reference for the game rules and the wire format; it is not used by the new server. The bot-facing API described below is being kept unchanged.
@@ -19,7 +10,10 @@ The MCP is being rebuilt on FastAPI, SQLAlchemy and SQLite in `src/ol_musky/`. T
 |2|Game engine: orders, mining, market, prospecting|next|
 |3|Tick loop and the team endpoints|-|
 |4|Admin endpoints, tracker and guide pages (MVP)|-|
-|5-7|Live spectator UI, hardening, tools and deployment|-|
+|5-6|Live spectator UI, hardening|-|
+|Sub-project|Update of all tools in `admin/` (after the application is complete)|-|
+
+The server runs on a local machine. Hosting is not decided and is not part of the current plan.
 
 **Quick start** (requires [uv](https://docs.astral.sh/uv/) and Python 3.12)
 

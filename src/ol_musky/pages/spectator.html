@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ol' Musky - Belt Watch</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #070b14;
+    --surface: #0e1524;
+    --edge: #1c2740;
+    --grid: #1a2540;
+    --text-primary: #e8edf7;
+    --text-secondary: #a3aec6;
+    --text-muted: #6b7896;
+    --accent: #ffb84d;
+    --ok: #5fd38d;
+    --bad: #ff6b6b;
+    --ore-x: rgb(96, 132, 255);
+    --ore-y: rgb(255, 104, 104);
+    --gutter: clamp(12px, 2vw, 28px);
+    --plot-height: clamp(140px, 20vh, 240px);
+    --axis-width: 56px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(1200px 600px at 70% -10%, #142042 0%, var(--bg) 60%) fixed, var(--bg);
+    color: var(--text-primary);
+    font: 16px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gutter);
+    padding: var(--gutter);
+  }
+  header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: clamp(20px, 2.4vw, 34px); font-weight: 650; }
+  h1 span { color: var(--accent); }
+  h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+  h2 small { color: var(--text-muted); font-weight: 400; margin-left: 6px; }
+  .meta { color: var(--text-secondary); font-size: clamp(13px, 1.1vw, 16px); }
+  .spacer { flex: 1; }
+  .link { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-secondary); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-muted); }
+  .live .dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+  .lost .dot { background: var(--bad); }
+
+  .panel { background: var(--surface); border: 1px solid var(--edge); border-radius: 14px; padding: 12px 14px; }
+  /* The belt is three times wider than its height. Its width is limited so that the page fits the screen. */
+  canvas { display: block; width: 100%; max-width: max(600px, calc((100vh - 26vh - 300px) * 3)); margin: 0 auto; }
+  .legend { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--text-secondary); font-size: 12px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; margin-left: 12px; }
+  .legend i:first-child { margin-left: 0; }
+  .legend .x { background: var(--ore-x); box-shadow: 0 0 8px var(--ore-x); }
+  .legend .y { background: var(--ore-y); box-shadow: 0 0 8px var(--ore-y); }
+  .legend .hub { border-radius: 3px; border: 1.5px solid var(--text-secondary); }
+
+  /* --- The bar chart: one bar for each team, one axis (the balance) --- */
+  .chart { position: relative; }
+  .plot { position: relative; height: var(--plot-height); margin-left: var(--axis-width); }
+  .tick { position: absolute; left: 0; right: 0; border-top: 1px solid var(--grid); }
+  .tick span {
+    position: absolute; right: 100%; top: -0.7em; margin-right: 8px;
+    color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .tick.base { border-top-color: var(--text-muted); }
+  .tick.start { border-top: 1px dashed var(--text-muted); }
+  .cols { display: flex; gap: 2px; margin-left: var(--axis-width); }
+  .plot .cols { position: absolute; inset: 0; margin-left: 0; align-items: stretch; }
+  .col { flex: 1 1 0; min-width: 0; position: relative; cursor: pointer; transition: opacity 0.2s; }
+  .col.dim { opacity: 0.3; }
+  .bar {
+    --c: var(--text-muted);
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    width: min(70%, 64px); height: 0;
+    border-radius: 4px 4px 0 0;
+    background: var(--c);
+    transition: height 0.4s linear;
+  }
+  /* Teams after the eighth use the same colours with a second encoding. */
+  .bar.hollow { background: transparent; border: 2px solid var(--c); border-bottom: 0; }
+  .bar.striped { background: repeating-linear-gradient(45deg, var(--c) 0 4px, transparent 4px 8px); border: 1px solid var(--c); border-bottom: 0; }
+  .value {
+    position: absolute; left: 0; right: 0; bottom: 0; text-align: center; padding-bottom: 4px;
+    font-size: clamp(11px, 1vw, 15px); font-weight: 600; font-variant-numeric: tabular-nums;
+    white-space: nowrap; transition: bottom 0.4s linear; pointer-events: none;
+  }
+  .names .col { padding: 8px 2px 0; text-align: center; }
+  .name { font-size: clamp(11px, 1vw, 15px); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; background: var(--c); }
+  .chip.hollow { background: transparent; border: 2px solid var(--c); }
+  .chip.striped { background: repeating-linear-gradient(45deg, var(--c) 0 2px, transparent 2px 4px); border: 1px solid var(--c); }
+  .when { color: var(--text-secondary); font-size: clamp(10px, 0.85vw, 13px); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .col.picked .name { text-decoration: underline; text-underline-offset: 3px; }
+  .empty { color: var(--text-secondary); padding: 16px 0; }
+
+  .tip {
+    position: fixed; z-index: 10; pointer-events: none; display: none;
+    background: #162038; border: 1px solid var(--edge); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
+  .tip b { display: block; font-size: 14px; margin-bottom: 4px; }
+  .tip dl { margin: 0; display: grid; grid-template-columns: auto auto; gap: 2px 14px; }
+  .tip dt { color: var(--text-secondary); }
+  .tip dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+  details { margin-top: 12px; color: var(--text-secondary); font-size: 13px; }
+  summary { cursor: pointer; width: max-content; }
+  table { border-collapse: collapse; margin-top: 8px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  th, td { padding: 4px 14px 4px 0; text-align: right; border-bottom: 1px solid var(--grid); }
+  th { color: var(--text-secondary); font-weight: 500; }
+  th:first-child, td:first-child { text-align: left; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ol' Musky <span>Belt Watch</span></h1>
+  <div class="meta" id="meta"></div>
+  <div class="spacer"></div>
+  <div class="link" id="link"><span class="dot"></span><span id="linkText">connecting</span></div>
+</header>
+
+<section class="panel">
+  <canvas id="belt" aria-label="The asteroid belt, with the hubs that mine"></canvas>
+  <div class="legend"><i class="x"></i>ore X<i class="y"></i>ore Y<i class="hub"></i>hub that mines, in the colour of its team</div>
+</section>
+
+<section class="panel chart">
+  <h2>Balance of each team <small>millions of dollars &middot; dashed line: the starting capital<span id="capital"></span></small></h2>
+  <div class="plot" id="plot">
+    <div id="ticks"></div>
+    <div class="cols" id="bars"></div>
+  </div>
+  <div class="cols names" id="names"></div>
+  <details>
+    <summary>Table</summary>
+    <table>
+      <thead><tr><th>Team</th><th>State</th><th>Week</th><th>Balance</th><th>Profit</th><th>Hubs that mine</th><th>Hubs</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </details>
+</section>
+<div class="tip" id="tip"></div>
+
+<script>
+"use strict";
+
+// The categorical colours for the dark surface, in a fixed sequence. The colour
+// follows the team (its position in the name sequence), not its rank.
+const PALETTE = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#0ca30c", "#9085e9", "#e66767"];
+// After eight teams the colours start again with a second encoding.
+const VARIANTS = ["filled", "hollow", "striped"];
+const ORE_RGB = { X: "96, 132, 255", Y: "255, 104, 104" };
+const POLL_MS = 1000;
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("belt");
+const ctx = canvas.getContext("2d");
+const haze = document.createElement("canvas");    // the ore, drawn one time for each canvas size
+
+let state = null;    // the live data of all teams
+let belt = null;     // the ore of the belt at the start of a game
+let picked = null;   // team name that the viewer selected
+let hovered = null;  // team name under the pointer
+const columns = new Map();   // team name -> the elements of its column
+
+const lookOf = (index) => ({
+  colour: PALETTE[index % PALETTE.length],
+  variant: VARIANTS[Math.floor(index / PALETTE.length) % VARIANTS.length],
+});
+const money = (value) => Math.round(value).toLocaleString("en-CA");
+const signed = (value) => (value >= 0 ? "+" : "−") + money(Math.abs(value));
+const focusTeam = () => hovered ?? picked;
+const make = (tag, className, text) => {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+};
+
+// --- The belt ---------------------------------------------------------------------------
+
+function sizeCanvas() {
+  if (!state) return;
+  const width = canvas.clientWidth;
+  const height = Math.round(width * state.rows / state.cols);
+  const ratio = window.devicePixelRatio || 1;
+  canvas.style.height = height + "px";
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  drawHaze();
+}
+
+// The ore as a haze: one soft glow for each sector that has ore. A larger deposit
+// gives a larger and brighter glow. The haze shows the belt before a team mines it.
+function drawHaze() {
+  if (!belt) return;
+  haze.width = canvas.width;
+  haze.height = canvas.height;
+  const pen = haze.getContext("2d");
+  const ratio = window.devicePixelRatio || 1;
+  pen.setTransform(ratio, 0, 0, ratio, 0, 0);
+  pen.globalCompositeOperation = "lighter";
+  const cell = canvas.clientWidth / belt.cols;
+  const largest = belt.deposits.reduce((a, b) => Math.max(a, b), 1);
+  belt.deposits.forEach((deposit, sector) => {
+    if (deposit <= 0) return;
+    const share = deposit / largest;
+    const x = (sector % belt.cols + 0.5) * cell;
+    const y = (Math.floor(sector / belt.cols) + 0.5) * cell;
+    const radius = cell * (0.8 + 1.5 * Math.sqrt(share));
+    const rgb = ORE_RGB[belt.ores[sector]] ?? "200, 200, 200";
+    const glow = pen.createRadialGradient(x, y, 0, x, y, radius);
+    glow.addColorStop(0, `rgba(${rgb}, ${0.04 + 0.2 * share})`);
+    glow.addColorStop(1, `rgba(${rgb}, 0)`);
+    pen.fillStyle = glow;
+    pen.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+  });
+}
+
+function drawBelt() {
+  if (!state) return;
+  const width = canvas.clientWidth;
+  const cell = width / state.cols;
+  ctx.clearRect(0, 0, width, cell * state.rows);
+  if (belt) ctx.drawImage(haze, 0, 0, width, cell * state.rows);
+
+  const focus = focusTeam();
+  const order = state.teams
+    .map((team, index) => ({ team, look: lookOf(index) }))
+    .filter(({ team }) => team.hubs)
+    .sort((a, b) => (a.team.name === focus) - (b.team.name === focus));  // the focus team is on top
+
+  for (const { team, look } of order) {
+    const dim = focus !== null && team.name !== focus;
+    for (const hub of team.hubs) {
+      // Only the hubs that mine are in the graphic.
+      if (hub.state === "mining") drawHub(hub, look, cell, dim ? 0.12 : 1);
+    }
+  }
+}
+
+function drawHub(hub, look, cell, alpha) {
+  const { rows, cols } = state;
+  const row = Math.floor(hub.sector_id / cols);
+  const col = hub.sector_id % cols;
+  // The footprint: the hub's sector and the adjacent sectors, inside the belt.
+  const left = Math.max(col - 1, 0), right = Math.min(col + 1, cols - 1);
+  const top = Math.max(row - 1, 0), bottom = Math.min(row + 1, rows - 1);
+  const x = left * cell + 0.5, y = top * cell + 0.5;
+  const w = (right - left + 1) * cell - 1, h = (bottom - top + 1) * cell - 1;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, Math.min(cell * 0.45, 5));
+  ctx.globalAlpha = alpha * 0.6;        // a dark base keeps the hub clear on top of the haze
+  ctx.fillStyle = "#070b14";
+  ctx.fill();
+  if (look.variant === "filled") {
+    ctx.globalAlpha = alpha * 0.35;
+    ctx.fillStyle = look.colour;
+    ctx.fill();
+  }
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = Math.max(1.5, cell * 0.14);
+  ctx.strokeStyle = look.colour;
+  if (look.variant === "striped") ctx.setLineDash([cell * 0.45, cell * 0.3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // The hub itself, at the centre sector.
+  ctx.beginPath();
+  ctx.arc(col * cell + cell / 2, row * cell + cell / 2, Math.max(1.5, cell * 0.32), 0, Math.PI * 2);
+  ctx.fillStyle = look.colour;
+  if (look.variant === "hollow") ctx.stroke(); else ctx.fill();
+  ctx.restore();
+}
+
+// --- The bar chart ----------------------------------------------------------------------
+
+// Round axis steps: 1, 2 or 5 times a power of ten, for four to eight steps.
+function axisStep(top) {
+  const rough = top / 5;
+  const power = Math.pow(10, Math.floor(Math.log10(rough)));
+  return [1, 2, 5, 10].map((m) => m * power).find((step) => step >= rough);
+}
+
+function buildColumns() {
+  columns.clear();
+  const bars = [], names = [];
+  state.teams.forEach((team, index) => {
+    const look = lookOf(index);
+    const barCol = make("div", "col");
+    const bar = make("div", "bar " + look.variant);
+    bar.style.setProperty("--c", look.colour);
+    const value = make("div", "value");
+    barCol.append(bar, value);
+
+    const nameCol = make("div", "col");
+    const name = make("div", "name");
+    const chip = make("span", "chip " + look.variant);
+    chip.style.setProperty("--c", look.colour);
+    name.append(chip, team.name);
+    const when = make("div", "when");
+    nameCol.append(name, when);
+
+    for (const col of [barCol, nameCol]) col.dataset.name = team.name;
+    columns.set(team.name, { barCol, nameCol, bar, value, when });
+    bars.push(barCol);
+    names.push(nameCol);
+  });
+  $("bars").replaceChildren(...bars);
+  $("names").replaceChildren(...names);
+  if (state.teams.length === 0) $("names").replaceChildren(make("p", "empty", "No teams are registered."));
+}
+
+function whenText(team) {
+  if (team.state === "waiting") return "not started";
+  if (team.state === "finished") return "finished";
+  return "week " + team.week;
+}
+
+function drawChart() {
+  const known = state.teams.map((team) => team.name).join("\n");
+  if (known !== [...columns.keys()].join("\n")) buildColumns();
+
+  const started = state.teams.filter((team) => team.state !== "waiting");
+  const highest = Math.max(state.starting_capital, ...started.map((team) => team.balance));
+  const step = axisStep(highest * 1.12);
+  const top = Math.ceil(highest * 1.12 / step) * step;
+  const at = (value) => (100 * value / top) + "%";
+
+  const ticks = [];
+  for (let value = 0; value <= top; value += step) {
+    const tick = make("div", value === 0 ? "tick base" : "tick");
+    tick.style.bottom = at(value);
+    tick.append(make("span", "", money(value)));
+    ticks.push(tick);
+  }
+  const start = make("div", "tick start");
+  start.style.bottom = at(state.starting_capital);
+  $("capital").textContent = " (" + money(state.starting_capital) + ")";
+  $("ticks").replaceChildren(...ticks, start);
+
+  for (const team of state.teams) {
+    const { bar, value, when } = columns.get(team.name);
+    const playing = team.state !== "waiting";
+    bar.style.height = playing ? at(team.balance) : "0";
+    value.style.bottom = playing ? at(team.balance) : "0";
+    value.textContent = playing ? money(team.balance) : "";
+    when.textContent = whenText(team);
+  }
+
+  $("rows").replaceChildren(...state.teams.map((team) => {
+    const row = make("tr");
+    const playing = team.state !== "waiting";
+    const mining = playing ? team.hubs.filter((hub) => hub.state === "mining").length : "";
+    row.append(
+      make("td", "", team.name),
+      make("td", "", whenText(team).replace(/^week.*/, "in play")),
+      make("td", "", playing ? team.week + " / " + state.lifetime : ""),
+      make("td", "", playing ? money(team.balance) : ""),
+      make("td", "", playing ? signed(team.balance - state.starting_capital) : ""),
+      make("td", "", mining),
+      make("td", "", playing ? team.hubs.length : ""),
+    );
+    return row;
+  }));
+  markFocus();
+  if (hovered) fillTip(hovered);
+}
+
+function markFocus() {
+  const focus = focusTeam();
+  for (const [name, { barCol, nameCol }] of columns) {
+    for (const col of [barCol, nameCol]) {
+      col.classList.toggle("dim", focus !== null && name !== focus);
+      col.classList.toggle("picked", name === picked);
+    }
+  }
+}
+
+// --- Hover and selection ----------------------------------------------------------------
+
+function fillTip(name) {
+  const team = state.teams.find((candidate) => candidate.name === name);
+  if (!team) return;
+  const lines = [["State", whenText(team).replace(/^week.*/, "in play")]];
+  if (team.state !== "waiting") {
+    const mining = team.hubs.filter((hub) => hub.state === "mining").length;
+    const transit = team.hubs.filter((hub) => hub.state === "in_transit").length;
+    lines.push(
+      ["Week", team.week + " / " + state.lifetime],
+      ["Balance", "$" + money(team.balance) + "M"],
+      ["Profit", signed(team.balance - state.starting_capital)],
+      ["Hubs that mine", mining + " of " + team.hubs.length],
+      ["Hubs in transit", transit],
+    );
+  }
+  const list = make("dl");
+  for (const [term, detail] of lines) list.append(make("dt", "", term), make("dd", "", String(detail)));
+  $("tip").replaceChildren(make("b", "", team.name), list);
+}
+
+function onPointer(event) {
+  const col = event.target.closest(".col");
+  const name = col ? col.dataset.name : null;
+  const tip = $("tip");
+  if (name !== hovered) {
+    hovered = name;
+    markFocus();
+    drawBelt();
+    if (name) fillTip(name);
+  }
+  tip.style.display = name ? "block" : "none";
+  if (name) {
+    const x = Math.min(event.clientX + 16, window.innerWidth - tip.offsetWidth - 8);
+    tip.style.left = Math.max(8, x) + "px";
+    tip.style.top = Math.max(8, event.clientY - tip.offsetHeight - 12) + "px";
+  }
+}
+
+for (const id of ["bars", "names"]) {
+  $(id).addEventListener("pointermove", onPointer);
+  $(id).addEventListener("pointerleave", () => onPointer({ target: document.body }));
+  $(id).addEventListener("click", (event) => {
+    const col = event.target.closest(".col");
+    if (!col) return;
+    picked = picked === col.dataset.name ? null : col.dataset.name;
+    markFocus();
+    drawBelt();
+  });
+}
+
+// --- The feed ---------------------------------------------------------------------------
+
+function setLink(ok) {
+  $("link").className = "link " + (ok ? "live" : "lost");
+  $("linkText").textContent = ok ? "live" : "no connection";
+}
+
+async function refresh() {
+  try {
+    const response = await fetch("spectator/state", { cache: "no-store" });
+    if (!response.ok) throw new Error(response.status);
+    const first = state === null;
+    state = await response.json();
+    if (belt === null) {
+      const beltResponse = await fetch("spectator/belt", { cache: "no-store" });
+      if (beltResponse.ok) belt = await beltResponse.json();
+    }
+    setLink(true);
+    const playing = state.teams.filter((team) => team.state === "playing").length;
+    $("meta").textContent = "scenario " + state.scenario + "  ·  " + state.cols + " × " + state.rows +
+      " sectors  ·  " + playing + " of " + state.teams.length + " teams in play";
+    if (first) sizeCanvas();
+    drawBelt();
+    drawChart();
+  } catch (error) {
+    setLink(false);
+  }
+}
+
+window.addEventListener("resize", () => { sizeCanvas(); drawBelt(); });
+refresh();
+setInterval(refresh, POLL_MS);
+</script>
+</body>
+</html>

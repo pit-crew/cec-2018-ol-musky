@@ -10,11 +10,9 @@ from zlib import crc32
 from ol_musky import market
 from ol_musky.game import Deliver, Sell
 from ol_musky.ledger import balance
-from ol_musky.placement import Land, is_mining
+from ol_musky.placement import Land, hub_state
 from ol_musky.timeline import pending
 from ol_musky.world import Cost, World
-
-NOT_PLACED = -1
 
 # The survey error is +/- (largest deposit / 6.5), which is approximately 15 %.
 _SURVEY_ERROR_DIVISOR = 6.5
@@ -24,14 +22,19 @@ _SURVEY_ERROR_DIVISOR = 6.5
 
 
 def hub(world: World, hub_id: str) -> dict:
-    """One hub. `sector_id` is the place that the hub holds: it is there, or in transit to it."""
-    state = world.hubs[hub_id]
+    """One hub.
+
+    `state` is "idle", "in_transit", or "mining". `sector_id` is the sector that
+    the hub holds: where it mines, or where it goes to. An idle hub holds no
+    sector, and its `sector_id` is null.
+    """
+    hold = world.hubs[hub_id]
     return {
         "hub_id": hub_id,
-        "sector_id": world.sites.get(hub_id, NOT_PLACED),
-        "active": is_mining(world, hub_id),
-        "amt": dict(state.hold),
-        "space_remaining": int(100 * state.free / state.capacity),  # percent
+        "state": hub_state(world, hub_id).value,
+        "sector_id": world.sites.get(hub_id),
+        "amt": dict(hold.hold),
+        "space_remaining": int(100 * hold.free / hold.capacity),  # percent
     }
 
 

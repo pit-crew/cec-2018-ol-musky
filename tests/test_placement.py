@@ -131,6 +131,15 @@ def test_a_hub_at_the_corner_has_three_bots(world):
     assert sorted(landed.miners) == [1, COLS, COLS + 1]
 
 
+def test_hub_state_follows_where_the_hub_and_its_bots_are(world):
+    assert placement.hub_state(world, "A") == "idle"
+    placed = claim(world, "A", CENTRE)
+    assert placement.hub_state(placed, "A") == "in_transit"
+    assert placement.hub_state(land(placed, "A"), "A") == "mining"
+    assert placement.hub_state(lift(land(placed, "A"), "A"), "A") == "idle"
+    assert placement.in_transit(placed, "A") and not placement.in_transit(world, "A")
+
+
 def test_land_rules(world):
     rejected(placement.HUB_HAS_NO_PLACE, land, world, "A")
     landed = land(claim(world, "A", CENTRE), "A")

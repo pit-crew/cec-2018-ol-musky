@@ -56,16 +56,16 @@ def test_status_follows_a_hub_through_its_life(world):
     assert reports.status(idle)["orders"] == []
     assert reports.status(idle)["hubs"]["A"] == {
         "hub_id": "A",
-        "sector_id": -1,
-        "active": False,
+        "state": "idle",
+        "sector_id": None,
         "amt": {},
         "space_remaining": 100,
     }
 
     in_transit = deploy(idle, {"A": CENTRE})
     report = reports.status(in_transit)
-    assert report["hubs"]["A"]["sector_id"] == CENTRE  # the place that the hub goes to
-    assert report["hubs"]["A"]["active"] is False
+    assert report["hubs"]["A"]["state"] == "in_transit"
+    assert report["hubs"]["A"]["sector_id"] == CENTRE  # the sector that the hub goes to
     assert report["orders"] == [
         {"week": 5, "action": "relocate_hubs", "hub_list": ["A"], "sector_id_list": [CENTRE]}
     ]
@@ -73,20 +73,21 @@ def test_status_follows_a_hub_through_its_life(world):
     mining = after(in_transit, 5)
     assert reports.status(mining)["hubs"]["A"] == {
         "hub_id": "A",
+        "state": "mining",
         "sector_id": CENTRE,
-        "active": True,
         "amt": {"X": 1600},
         "space_remaining": 20,
     }
 
     shipped = ship(mining, ["A"])
     report = reports.status(shipped)
-    assert report["hubs"]["A"]["amt"] == {} and report["hubs"]["A"]["active"] is True
+    assert report["hubs"]["A"]["amt"] == {} and report["hubs"]["A"]["state"] == "mining"
     assert report["orders"] == [{"week": 11, "action": "sell_ore", "ore_load": {"X": 1600}}]
     assert report["balance"] == balance(shipped)
 
     moving = move(shipped, {"A": FAR})
-    assert reports.status(moving)["hubs"]["A"]["active"] is False
+    hub = reports.status(moving)["hubs"]["A"]
+    assert (hub["state"], hub["sector_id"]) == ("in_transit", FAR)
     assert [o["action"] for o in reports.status(moving)["orders"]] == [
         "relocate_hubs",
         "sell_ore",

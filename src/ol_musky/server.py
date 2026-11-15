@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, FastAPI, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
-from ol_musky import game, league, ledger, placement, reports
+from ol_musky import game, league, ledger, placement, reports, spectator
 from ol_musky.league import League, Team
 from ol_musky.rejection import Rejected, require
 from ol_musky.scenario import read_scenario, read_teams
@@ -206,6 +206,35 @@ async def ship_ore(team: LiveTeam, league: Leagues, hubs: ListParam = None) -> J
     return envelope("ship_ore", {"hubs_dumped": len(known), "ore": dict(load)})
 
 
+# --- Spectator -------------------------------------------------------------------------
+
+PAGES = Path(__file__).parent / "pages"
+pages = APIRouter()
+
+
+@pages.get("/", include_in_schema=False)
+async def home() -> RedirectResponse:
+    return RedirectResponse("/spectator")
+
+
+@pages.get("/spectator", include_in_schema=False)
+async def spectator_page() -> FileResponse:
+    """The live view of the belt and the teams."""
+    return FileResponse(PAGES / "spectator.html", media_type="text/html")
+
+
+@pages.get("/spectator/state")
+async def spectator_state(league: Leagues) -> dict:
+    """The live data of the spectator page: all teams, with no tokens."""
+    return spectator.snapshot(league)
+
+
+@pages.get("/spectator/belt")
+async def spectator_belt(league: Leagues) -> dict:
+    """The background of the spectator page: the ore of the belt at the start of a game."""
+    return spectator.belt(league)
+
+
 # --- Application -----------------------------------------------------------------------
 
 
@@ -222,6 +251,7 @@ def create_app(league: League) -> FastAPI:
     app.state.league = league
     app.add_exception_handler(Rejected, rejected)
     app.include_router(router)
+    app.include_router(pages)
     return app
 
 

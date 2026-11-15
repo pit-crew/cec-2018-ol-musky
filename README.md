@@ -1,6 +1,6 @@
 ## Redevelopment (2026)
 
-The game server is being built again from an empty start, one layer at a time. Each layer has its own tests and depends only on the layers before it. The competition text and the API specification below describe the 2018 game. The new server supplies that API; the response examples below are not yet updated where the content differs.
+The game server is being built again from an empty start, one layer at a time. Each layer has its own tests and depends only on the layers before it. The competition text and the API specification below describe the game as this server supplies it.
 
 **Design**
 
@@ -23,7 +23,8 @@ The engine follows the dataflow idea of the Lucid language: a value is a stream,
 |4|`ledger.py`, `market.py`, `game.py`|Money, ore prices, and the player commands `build`, `deploy`, `move`, `ship`|done|
 |5|`reports.py`, `clock.py`|Status, ledger, market, parameters and prospecting views; the clock of a team|done|
 |6|`scenario.py`, `league.py`, `server.py`|Scenario and team files; teams and their clocks; the HTTP API|done|
-|7|-|Admin functions, spectator page, guide page, export of results|next|
+|7|`spectator.py`, `pages/spectator.html`|Spectator page: the ore of the belt, the hubs that mine, and a bar chart of the balances, live|done|
+|8|-|Admin functions, guide page, export of results|next|
 
 `world.py` holds the immutable values (`World`, `Asteroid`, `Hub`, `Terms`), and `rejection.py` holds the error for a command that breaks a rule. All modules are in `src/ol_musky/`. Piracy and insurance are not in the game at this time.
 
@@ -33,13 +34,17 @@ The engine follows the dataflow idea of the Lucid language: a value is a stream,
 
 ```sh
 uv sync
-uv run ol-musky                 # http://127.0.0.1:8000, interactive API docs at /docs
+uv run ol-musky                 # spectator page at http://127.0.0.1:8000, API docs at /docs
 curl 'http://127.0.0.1:8000/mcp/startup?token=dev'
 curl 'http://127.0.0.1:8000/mcp/build_hubs?token=dev&hubs=A'
 curl 'http://127.0.0.1:8000/mcp/status_report?token=dev'
 ```
 
 The server reads `config/mcp.yaml` (the scenario and its belt file) and `config/teams.yaml` (API token and name of each team) at start. The environment variables `OL_MUSKY_SCENARIO`, `OL_MUSKY_TEAMS`, `OL_MUSKY_HOST` and `OL_MUSKY_PORT` change the files and the address. The state is in memory only.
+
+**Spectator page.** `http://127.0.0.1:8000/` shows the belt and a bar chart. The belt has a haze of the ore at the start of a game (one colour for each ore type; a larger deposit is larger and brighter), and a square for each hub that mines, in the colour of its team. Hubs that are idle or in transit are not in the graphic. The bar chart has one bar for each team, for its balance, with the week of the team below its name; a dashed line shows the starting capital. The teams are in the sequence of their names, so that a bar and its colour stay in the same position. After eight teams the colours start again with outlined bars and hubs, and then with striped ones. Point at a team, or click it, to show only that team in the belt and to see its details. The page reads `/spectator/state` one time each second and `/spectator/belt` one time. The data has no API tokens. The players do not have access to this page during a competition; the server does not restrict access to it.
+
+The tools in `admin/` and the guide page in `templates/` are from the 2018 server. They stay unchanged until the application is complete.
 
 **Development**
 
@@ -60,14 +65,14 @@ uv run ruff check . && uv run ruff format --check src tests
 
 Your mandate is to develop an autonomous asteroid mining system (AI) that makes the most money with the fewest resources for the Ol' Musky Mining Company.  
 
-Starting with $250,000,000 of capital, your AI will interface with Ol' Musky's **Master Control Program (MCP)** which will carry out your instructions and queries for **all** phases of your mining operation. Your AI will be responsible for building and deploying robotic mining hubs in the asteroid belt between Mars and Jupiter and shipping the ore back to Earth. Your task is basically engineering a Supply Chain Management AI. Easy, eh?
+Starting with $175,000,000 of capital, your AI will interface with Ol' Musky's **Master Control Program (MCP)** which will carry out your instructions and queries for **all** phases of your mining operation. Your AI will be responsible for building and deploying robotic mining hubs in the asteroid belt between Mars and Jupiter and shipping the ore back to Earth. Your task is basically engineering a Supply Chain Management AI. Easy, eh?
 
 ![Ore Deposit Sample](static/belt-sample.png)
  **Fig 1. Sample distribution of ore deposits**
 
 ### Operations (What your AI will do)
 
-**Your AI will be completely autonomous**; i.e. once initiated, it will run entirely on its own without input or intervention until the time limit has been reached. Time is measured by the MCP in weeks where 1 MCP week = {{ms_per_week}}ms of real time. Each run is 5 MCP years which is about 1 minute of real time. During development, you may run your AI as often as you require.
+**Your AI will be completely autonomous**; i.e. once initiated, it will run entirely on its own without input or intervention until the time limit has been reached. Time is measured by the MCP in weeks where 1 MCP week = 200ms of real time. Each run is 600 MCP weeks which is about 2 minutes of real time. Your clock starts when your AI calls /mcp/startup, and each team has its own clock. During development, you may run your AI as often as you require.
 
 Think about what an "autonomous" architecture means: input -> decision -> action.
 
@@ -98,7 +103,7 @@ All communication with the MCP is done through its RESTful API. Your code can be
 
 - **Prospecting Report (Exploration)**
   - Using the /mcp/prospect_report API function, your AI will get data from on-going geological surveys and test bore-holes in the asteroid belt. The report is a list of sectors, the ore type found and an estimate of size of ore deposit in each sector. However, each report contains only a subset of the total sectors
-  - A new report is available every {{preport_freq}} MCP weeks progressively covering more of the belt.
+  - A new report is available every 85 MCP weeks progressively covering more of the belt.
   ![Prospecting Report](static/prospect_report-0.png "Prospecting Report")
   **Fig 2. Example of one prospect report - a diagonal exploratory "pass"**
   ![Prospecting Report](static/prospect_report.png "Prospecting Report")
@@ -115,7 +120,7 @@ All communication with the MCP is done through its RESTful API. Your code can be
   - The /mcp/status_report provides a snapshot of your operation including your bank balance at the time of the report.
     - Team attributes
     - Financial (see below)
-    - List of hubs, their sector IDs, the space remaining in the hub and amount of accumulated ore
+    - List of hubs, their state (idle, in transit or mining), their sector IDs, the space remaining in the hub and amount of accumulated ore
     - List of outstanding work-orders
 
 - **Get Ledger (Financials)**
@@ -135,10 +140,12 @@ All communication with the MCP is done through its RESTful API. Your code can be
 - **Costs**
     |Action|Cost (x millions)|Time (weeks)|
     |:---:|:---|:---:|
-    |Build a Hub|${{build_rate}} per hub|{{build_weeks}}|
-    |Deploy a Hub|${{deploy_rate}} per hub|{{deploy_weeks}}|
-    |Move a Hub|${{move_rate}} per hub|{{move_weeks}}|
-    |Ship Ore|${{ship_rate}} per 1000 tonnes|{{ship_weeks}}|
+    |Build a Hub|$20 per hub|5|
+    |Deploy a Hub|$30 per hub|17|
+    |Move a Hub|$10 per hub|2|
+    |Ship Ore|$1.5 per 1000 tonnes|18|
+
+  These are the values of the development scenario (`config/mcp.yaml`). The /mcp/parameters API gives the values that are in effect.
 
 - **Revenue**
   - On Earth, the minerals are automatically extracted from the ore and sold (revenue) at the market value upon arrival.
@@ -151,10 +158,12 @@ All communication with the MCP is done through its RESTful API. Your code can be
 - bots may not mine the sector on which the hub is deployed
 - bots cannot simultaneously mine the same sectors
 - mining stops when a hub is full, the ore is depleted or when a hub is being deployed or moved
+- the capacity of a hub is the total of all ore types; a full hub does not deplete its sectors
+- hubs in transit hold their destination: you cannot deploy a different hub to sectors that touch it
 
 ## Tips:
 
-- To avoid disqualification through inadvertently DDoSing the server, we recommend your AI checks the status of your orders (in the /mcp/status_report) with a reasonable frequency since the report is updated only once per MCP week ({{ms_per_week}}ms).
+- To avoid disqualification through inadvertently DDoSing the server, we recommend your AI checks the status of your orders (in the /mcp/status_report) with a reasonable frequency since the report is updated only once per MCP week (200ms).
 - Related to DDoS, also keep an eye on how much data you transmit to the MPC - it doesn't have unlimited bandwidth
 - Keep in mind your goal is to earn the most money, so partition your development tasks wisely.
 - Be aware that timing won't be exact. Code takes time to execute, data takes time to transmit and networks have contention.
@@ -195,271 +204,400 @@ Objective scoring is based solely on profit (Revenues - Expenses)
 
 ### API Specification
 
-All RESTful calls to the MCP must be HTTP GET and use this format:
+All calls to the MCP are HTTP GET and use this format:
 
 `http://127.0.0.1:8000/mcp/[api]?token=[security api token]`
 
-All responses from the MCP will be in standard JSON format.
+- Lists are comma-separated, for example `hubs=A,B&sector_ids=120,853`.
+- A hub ID has 8 or fewer characters: letters, digits, `-` and `_`.
+- All responses are JSON with HTTP status 200, in this envelope:
+
+  ```json
+  {"<api>": <data>, "status": <code>, "description": "<text>"}
+  ```
+
+  `status` 0 is success. Other values are in [MCP Response Status Codes](#mcp-response-status-codes). For an error with a code below 2000, and for "times up", the first key is `validation`.
+- Money is in millions of dollars. Ore is in tonnes.
 
 - **Startup**
+
   `GET /mcp/startup?token=[api_token]`
-  Example response:
-  
-   ```json
-   startup
-   {
-      "status_report": {
-          "team": {
-              "token": "28758463883",
-              "name": "eastbank",
-              "week": 0,
-              "start_time": "2018-02-04 00:42:55.426631+00:00",
-              "balance": 250
-          },
-          "ledger": [
-              {
-                  "week": 0,
-                  "item": "startup",
-                   "credit": 250.0,
-                   "debit": 0.0
-              }
-          ],
-          "hubs": {}
+
+  Starts your game again and starts your clock: week 0, the starting capital, no hubs, no history. You can call it as frequently as you want. The response is a status report.
+
+  ```json
+  {
+    "startup": {
+      "team": {
+        "token": "71a653928dc1152537d002cd1349f0d4",
+        "name": "testgremlins",
+        "week": 0,
+        "start_time": "2018-03-09 14:00:00+00:00",
+        "balance": 175
       },
-      "status": 0,
-      "description": ""
-   }
-   ```json
+      "hubs": {},
+      "orders": []
+    },
+    "status": 0,
+    "description": ""
+  }
+  ```
 
 - **Status Report**
 
   `GET /mcp/status_report?token=[api_token]`
 
-  The most important of all requests, it includes your team's:
+  The most important of all requests. It includes:
 
-  - Attributes including the all important balance
-  - List of built/deployed hubs.
-  - List of pending MCP orders.
-  - Key info about each hub:
-    - sector_id: when -1, it means hub has not been deployed
-    - amt: the amount of accumulated ore for each ore type collected
-    - space_remaining: easy way to determine how "full" the hub is (%)
-    - active: when True, hub is actively mining - False only while deploying and moving the hub
+  - `team`: your team, your current week, and your balance.
+  - `hubs`: each hub that you have. Key info about each hub:
+    - `state`: `"idle"` (not deployed), `"in_transit"` (it goes to a sector and does not mine), or `"mining"`.
+    - `sector_id`: the sector that the hub holds: where it mines, or where it goes to. It is `null` for an idle hub.
+    - `amt`: the accumulated ore of each ore type.
+    - `space_remaining`: how much of the hub capacity is free (%). The capacity is the total of all ore types.
+  - `orders`: the pending work orders, in the sequence of their completion weeks. An order that is complete is not in the list.
+    - `deliver_hubs`: new hubs arrive from the factory (`hub_list`).
+    - `relocate_hubs`: a hub arrives at its sector and starts to mine (`hub_list`, `sector_id_list`). Each hub has its own order.
+    - `sell_ore`: a shipment arrives on Earth and sells (`ore_load`).
 
-  Example Response:
+  Example response, 3 weeks after a deploy of hubs A and B:
 
   ```json
-  {"status_report": {
+  {
+    "status_report": {
       "team": {
-          "token": "71a653928dc1152537d002cd1349f0d4",
-          "name": "testgremlins",
-          "week": 20,
-          "start_time": "2018-02-10 07:53:16.279185+00:00",
-          "balance": 100
+        "token": "71a653928dc1152537d002cd1349f0d4",
+        "name": "testgremlins",
+        "week": 8,
+        "start_time": "2018-03-09 14:00:00+00:00",
+        "balance": 75
       },
       "hubs": {
-          "A": {
-              "hub_id": "A",
-              "start_time": "2018-02-10 07:53:19.469587+00:00",
-              "sector_id": -1,
-              "amt": { "X": 12726, "Y": 324 },
-              "space_remaining": 100,
-              "active": false
-          }
+        "A": {
+          "hub_id": "A",
+          "state": "in_transit",
+          "sector_id": 3503,
+          "amt": {},
+          "space_remaining": 100
+        },
+        "B": {
+          "hub_id": "B",
+          "state": "in_transit",
+          "sector_id": 853,
+          "amt": {},
+          "space_remaining": 100
+        }
       },
       "orders": [
-          {
-              "week": 12,
-              "action": "deliver_hubs",
-              "hub_list": "A",
-              "sector_id_list": "",
-              "ore_load": 0,
-              "complete": false,
-              "insured": false,
-              "pirated": false
-          },
-          {
-              "week": 32,
-              "action": "relocate_hubs",
-              "hub_list": "A",
-              "sector_id_list": "0",
-              "ore_load": 0,
-              "complete": false,
-              "insured": false,
-              "pirated": false
-          }
+        {
+          "week": 22,
+          "action": "relocate_hubs",
+          "hub_list": ["A"],
+          "sector_id_list": [3503]
+        },
+        {
+          "week": 22,
+          "action": "relocate_hubs",
+          "hub_list": ["B"],
+          "sector_id_list": [853]
+        }
       ]
-  },"status": 0,  "description": ""}
+    },
+    "status": 0,
+    "description": ""
+  }
   ```
 
+  Example response when hub A mines, its first shipment is on its way to Earth, and hub B moves to a new sector:
+
+  ```json
+  {
+    "status_report": {
+      "team": {
+        "token": "71a653928dc1152537d002cd1349f0d4",
+        "name": "testgremlins",
+        "week": 43,
+        "start_time": "2018-03-09 14:00:00+00:00",
+        "balance": 27.5
+      },
+      "hubs": {
+        "A": {
+          "hub_id": "A",
+          "state": "mining",
+          "sector_id": 3503,
+          "amt": {"X": 2681, "Y": 383},
+          "space_remaining": 87
+        },
+        "B": {
+          "hub_id": "B",
+          "state": "in_transit",
+          "sector_id": 1500,
+          "amt": {"Y": 3830, "X": 21170},
+          "space_remaining": 0
+        }
+      },
+      "orders": [
+        {
+          "week": 44,
+          "action": "relocate_hubs",
+          "hub_list": ["B"],
+          "sector_id_list": [1500]
+        },
+        {
+          "week": 60,
+          "action": "sell_ore",
+          "ore_load": {"X": 21936, "Y": 3064}
+        }
+      ]
+    },
+    "status": 0,
+    "description": ""
+  }
+  ```
+
+- **Final Report**
+
+  `GET /mcp/final_report?token=[api_token]`
+
+  The status report with your ledger: `team`, `hubs`, `orders`, `ledger`. It is available after the end of the game.
+
 - **Get Ledger**
+
   Your accounting ledger.
+
   `GET /mcp/get_ledger?token=[api_token]`
 
-  Example Response
-  
   ```json
-  {"ledger": {
-      "ledger": [
-          {
-              "week": 0,
-              "item": "startup",
-              "credit": 150.0,
-              "debit": 0.0
-          },
-          {
-              "week": 7,
-              "item": "build hubs",
-              "credit": 0.0,
-              "debit": 20.0
-          },
-          {
-              "week": 15,
-              "item": "deploy hubs",
-              "credit": 0.0,
-              "debit": 30.0
-          }
-      ]
+  {
+    "ledger": [
+      {
+        "week": 0,
+        "item": "startup",
+        "credit": 175,
+        "debit": 0
+      },
+      {
+        "week": 0,
+        "item": "build hubs",
+        "credit": 0,
+        "debit": 40
+      },
+      {
+        "week": 5,
+        "item": "deploy hubs",
+        "credit": 0,
+        "debit": 60
+      },
+      {
+        "week": 42,
+        "item": "ship ore",
+        "credit": 0,
+        "debit": 37.5
+      },
+      {
+        "week": 42,
+        "item": "move hubs",
+        "credit": 0,
+        "debit": 10
+      },
+      {
+        "week": 60,
+        "item": "sell ore",
+        "credit": 52.9328,
+        "debit": 0
+      }
+    ],
+    "status": 0,
+    "description": ""
+  }
   ```
 
 - **Parameters**
-  These are the competition scenerio's constants. The costs are __per hub__ except for _ship_, which is cost __per 1000 tonnes__ of ore.
+
+  These are the constants of the scenario. The costs are __per hub__ except for _ship_, which is the cost __per 1000 tonnes__ of ore. `prospect_weeks` is the number of weeks between new prospecting reports.
+
   `GET /mcp/parameters?token=[api_token]`
 
-  Example Response
-  
-    ```json
-  {"parameters":{
-      "lifetime": 400,
-      "rows": 30,
-      "cols": 60,
-      "hub_capacity": 20000,
-      "mining_rate": 323,
-      "ms_per_week": 200,
+  ```json
+  {
+    "parameters": {
+      "lifetime": 600,
+      "rows": 40,
+      "cols": 120,
+      "hub_capacity": 25000,
+      "mining_rate": 383,
+      "starting_capital": 175,
+      "prospect_weeks": 85,
       "costs": {
-          "build": {
-              "item": "build",
-              "weeks": 5,
-              "rate": 15
-          },
-          "deploy": {
-              "item": "deploy",
-              "weeks": 15,
-              "rate": 25
-          },
-          "ship": {
-              "item": "ship",
-              "weeks": 12,
-              "rate": 13
-          },
-          "move": {
-              "item": "move",
-              "weeks": 2,
-              "rate": 5
-          }
-      }
-  },"status":0, "description":"ok"}
+        "build": {
+          "item": "build",
+          "weeks": 5,
+          "rate": 20
+        },
+        "deploy": {
+          "item": "deploy",
+          "weeks": 17,
+          "rate": 30
+        },
+        "move": {
+          "item": "move",
+          "weeks": 2,
+          "rate": 10
+        },
+        "ship": {
+          "item": "ship",
+          "weeks": 18,
+          "rate": 1.5
+        }
+      },
+      "ms_per_week": 200
+    },
+    "status": 0,
+    "description": ""
+  }
   ```
 
 - **Prospecting Report**
 
   `GET /mcp/prospect_report?token=[api_token]`
 
-  Each element of the prospect report indicates the sector ID, the ore type and the estimated deposit size.
-  Note: This report only shows new estimates; it does not repeat previous data. They are published every {{preport_freq}} weeks.
+  Each element of the report is `[sector_id, ore_type, estimated_tonnes]` (zero-based sector IDs).
 
-  Format [sector_id, ore_type, estimated_tonnes]
-
-  Example Response: (zero-based indexing)
-
-  ```json
-  {"prospect_report":{
-    "report": [
-        [0,  "X", 3352 ],
-        [7,  "X", 5184 ],
-        [14, "X", 0 ],
-        [21, "Y", 0 ],
-        [28, "X", 0 ],
-        [35, "X", 0 ],
-        [42, "X", 0 ],
-            .
-            .
-            .
-        [2681, "Y", 90249 ],
-        [2688, "X", 71194 ],
-        [2695, "X", 5584 ]
-    ]
-  },"status":0, "description":""}
-  ```
-
-- **Market Report**
-  `GET /mcp/market_report?token=[api_token]`
-
-   Ore prices change weekly
-
-  Example Response:
-
-  ```json
-  {"market_report": {
-     "week" : 42,
-     "prices": {"X": 4.32, "Y": 9.47},
-     "status": 0
-  }, "status": 0, "description": ""}
-  ```
-
-- **Build Hubs**
-  `GET /mcp/build_hubs?token=[api_token]&hubs=[H0,H1,...Hn]`
-
-  Example Response:
+  - The report shows only the sectors of the current survey pass; it does not repeat the sectors of previous passes. A new pass starts each `prospect_weeks` weeks.
+  - A second request in the same pass gives the same estimates.
+  - An estimate is for the ore that is in the sector at this time, with an error of approximately 15 % of the largest deposit.
 
   ```json
   {
-      "build_hubs": {
-          "hubs_built": 3,
-          "week": 0
-      },
-      "status": 0,
-      "description": ""
+    "prospect_report": {
+      "report": [
+        [0, "Y", 10744],
+        [7, "X", 52365],
+        [14, "X", 51916],
+        [21, "X", 0],
+        ...,
+        [4788, "Y", 116749],
+        [4795, "X", 20547]
+      ]
+    },
+    "status": 0,
+    "description": ""
+  }
+  ```
+
+- **Market Report**
+
+  `GET /mcp/market_report?token=[api_token]`
+
+  Ore prices change weekly. A price is for 1000 tonnes. Ore sells at the prices of the week in which the shipment arrives.
+
+  ```json
+  {
+    "market_report": {
+      "week": 42,
+      "prices": {"X": 2.66, "Y": 7.01}
+    },
+    "status": 0,
+    "description": ""
+  }
+  ```
+
+- **Build Hubs**
+
+  `GET /mcp/build_hubs?token=[api_token]&hubs=[H0,H1,...Hn]`
+
+  You select the hub IDs. Each ID must be new.
+
+  ```json
+  {
+    "build_hubs": {
+      "hubs_built": 2,
+      "week": 0
+    },
+    "status": 0,
+    "description": ""
   }
   ```
 
 - **Deploy Hubs**
-  The number of sector IDs must match the number of hub IDs. Sector IDs must be numeric - as they are in the prospect report
 
-  `GET /mcp/deploy_hubs?token=[api_token]&hubs=[H0,H1,...Hn]&sector_ids=[s0,s2,...,sn]`
-   
-   Example Response:
+  `GET /mcp/deploy_hubs?token=[api_token]&hubs=[H0,H1,...Hn]&sector_ids=[s0,s1,...,sn]`
+
+  Hub *n* goes to sector *n*. The number of sector IDs must be the same as the number of hub IDs.
+
+  - A hub holds its sector and the adjacent sectors from the time of the request. These sectors must not touch the sectors that a different hub of yours holds.
+  - If one hub in the request is rejected, the full request is rejected and you pay nothing.
+  - A hub that is in transit cannot get a new deploy or move request.
 
   ```json
-  {"deploy_hubs": {
-      "hubs_located": 3
-  },"status": 0,  "description": ""}
+  {
+    "deploy_hubs": {
+      "hubs_located": 2
+    },
+    "status": 0,
+    "description": ""
+  }
   ```
 
 - **Move Hubs**
-  `GET /mcp/move_hubs?token=[api_token]&hubs=[H0,H1,...Hn]&sector_ids=[s0,s2,...,sn]`
 
-   Example Response:
+  `GET /mcp/move_hubs?token=[api_token]&hubs=[H0,H1,...Hn]&sector_ids=[s0,s1,...,sn]`
+
+  The same as Deploy Hubs, for hubs that mine, at the move cost. The hub stops mining and releases its sectors immediately. It keeps its ore.
 
   ```json
-  {"move_hubs": {
-      "hubs_located": 2
-  },"status": 0,  "description": ""}
+  {
+    "move_hubs": {
+      "hubs_located": 1
+    },
+    "status": 0,
+    "description": ""
+  }
   ```
 
-### Ship Ore
+- **Ship Ore**
 
-`GET /mcp/ship_ore?token=[api_token]&hubs=[H0,H1,...Hn][&insured=true]`
+  `GET /mcp/ship_ore?token=[api_token]&hubs=[H0,H1,...Hn]`
 
-Example Response:
+  Empties the hubs and sends the ore to Earth. The hubs continue to mine.
 
-```json
-{"ship_ore": {
-   "hubs_dumped": 1,
-   "ore": {'X': 22980, 'Y': 3830}},
-   "price": 3.4
-},"status": 0, "description": ""}
-```
+  ```json
+  {
+    "ship_ore": {
+      "hubs_dumped": 1,
+      "ore": {"X": 21936, "Y": 3064}
+    },
+    "status": 0,
+    "description": ""
+  }
+  ```
+
+- **Errors**
+
+  An error has a status that is not 0, and a description. Example: a deploy to a sector that touches the sectors of hub A.
+
+  ```json
+  {
+    "deploy_hubs": {
+      "hubs_located": 1
+    },
+    "status": 0,
+    "description": ""
+  }
+  ```
+
+  After the last week of the game, each request other than `startup`, `parameters`, `final_report` and `get_ledger` gets this response:
+
+  ```json
+  {
+    "validation": {
+      "week": 661,
+      "max": 600
+    },
+    "status": -1,
+    "description": "times up"
+  }
+  ```
 
 #### Language reference for HTTP requests
 
@@ -476,23 +614,26 @@ If this is your first time making get requests; checkout the following language 
 
 |Action|Code|Description|
 |---|---|---|
+|all|-1|times up: the game is over|
 |validation|1000|token must be 32 or fewer alpha-numerics|
 |validation|1001|token required - see competition coordinator|
-|validation|1100|no team for token \<token\>|
-|validation|1201|name must be 32 or fewer alpha-numerics|
-|startup|2100|no team found for token=\<token\>|
+|validation|1100|unknown team|
+|validation|1102|team has not started: call /mcp/startup|
+|startup|2100|unknown team|
 |build_hubs|2301|not enough money|
-|deploy/move|2401|hub list and sector_id list need to be the same length \<length difference\>|
-|deploy/move|2402|some hubs requested do not exist|
-|deploy/move|2403|hubs: \<hub list\> currently being deployed|
-|deploy/move|2405|hubs must be deployed to separate sectors|
-|deploy/move|2406|mining bots must use separate sectors|
-|deploy/move|2407|unable to deploy to occupied sectors: \<guilty sector ID\>|
-|deploy/move|2408|hubs must be deployed before being moved|
+|build_hubs|2302|hub IDs must be new, not repeated, and 8 or fewer alpha-numerics|
+|deploy/move|2400|the hub list or the sector_id list is missing|
+|deploy/move|2401|hub list and sector_id list need to be the same length|
+|deploy/move|2402|a hub does not exist, or a hub ID is repeated|
+|deploy/move|2403|hub is in transit|
+|deploy/move|2404|a sector ID is not numeric or is outside the belt|
+|deploy/move|2407|place is taken: the sectors touch the sectors of a different hub|
+|move|2408|hub has no place: deploy it before you move it|
 |deploy/move|2409|not enough money|
-|ship_ore|2501|no hubs requested|
-|ship_ore|2502|no ore to ship from hub \<hub\>|
+|ship_ore|2501|no hubs in the request|
+|ship_ore|2502|no ore to ship|
 |ship_ore|2503|not enough money|
+|ship_ore|2504|unknown hub|
 
 
 ```plantuml

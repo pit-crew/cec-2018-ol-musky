@@ -16,6 +16,7 @@ A move is `lift`, then `claim` of the new place, then `land` when the hub arrive
 
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from functools import reduce
 
 from ol_musky.rejection import require
@@ -59,9 +60,20 @@ def is_mining(world: World, hub_id: str) -> bool:
     return any(hub_id in bots for bots in world.miners.values())
 
 
+class HubState(StrEnum):
+    IDLE = "idle"  # the hub holds no place
+    IN_TRANSIT = "in_transit"  # the hub holds a place and its bots are not in the belt
+    MINING = "mining"  # the bots of the hub are in the belt
+
+
+def hub_state(world: World, hub_id: str) -> HubState:
+    """The state of a hub, from where the hub and its bots are."""
+    states = (HubState.IDLE, HubState.IN_TRANSIT, HubState.MINING)
+    return states[(hub_id in world.sites) + is_mining(world, hub_id)]
+
+
 def in_transit(world: World, hub_id: str) -> bool:
-    """True when the hub holds a place and its bots are not in the belt."""
-    return hub_id in world.sites and not is_mining(world, hub_id)
+    return hub_state(world, hub_id) is HubState.IN_TRANSIT
 
 
 # --- Commands --------------------------------------------------------------------------

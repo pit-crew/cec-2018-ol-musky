@@ -238,22 +238,24 @@ def test_a_full_game_through_the_api(mcp, clock, scenario):
     clock.weeks(5)
     assert mcp.ok("status_report")["hubs"]["A"] == {
         "hub_id": "A",
-        "sector_id": -1,
-        "active": False,
+        "state": "idle",
+        "sector_id": None,
         "amt": {},
         "space_remaining": 100,
     }
 
     assert mcp.ok("deploy_hubs", hubs="A", sector_ids=str(site)) == {"hubs_located": 1}
     report = mcp.ok("status_report")
-    assert report["hubs"]["A"]["sector_id"] == site and not report["hubs"]["A"]["active"]
+    hub = report["hubs"]["A"]
+    assert (hub["state"], hub["sector_id"]) == ("in_transit", site)
     assert report["orders"] == [
         {"week": 22, "action": "relocate_hubs", "hub_list": ["A"], "sector_id_list": [site]}
     ]
 
     clock.weeks(17 + 5)
     hub = mcp.ok("status_report")["hubs"]["A"]
-    assert hub["active"] and sum(hub["amt"].values()) == 5 * 8 * 383
+    assert (hub["state"], hub["sector_id"]) == ("mining", site)
+    assert sum(hub["amt"].values()) == 5 * 8 * 383
     assert hub["space_remaining"] == int(100 * (25000 - 15320) / 25000)
 
     assert mcp.ok("ship_ore", hubs="A") == {"hubs_dumped": 1, "ore": hub["amt"]}
@@ -340,3 +342,81 @@ def test_times_up(mcp, clock):
     assert mcp.ok("final_report")["team"]["week"] == 600
     assert len(mcp.ok("get_ledger", "ledger")) == 2
     assert mcp.ok("startup")["team"]["week"] == 0
+
+
+# --- Spectator -------------------------------------------------------------------------
+
+
+def test_spectator_state(mcp, teams, clock, scenario):
+    teams.register("zz-token", "Idlers")
+    teams.register("aa-token", "eastbank")
+    site = best_sector(scenario)
+    mcp.ok("startup")
+    mcp.ok("build_hubs", hubs="A,B")
+    clock.weeks(5)
+    mcp.ok("deploy_hubs", hubs="A", sector_ids=str(site))
+    Mcp(mcp.client, "aa-token").ok("startup")
+    clock.weeks(17 + 10)
+
+    state = mcp.client.get("/spectator/state").json()
+    assert {key: state[key] for key in ("scenario", "rows", "cols", "lifetime")} == {
+        "scenario": "debug",
+        "rows": 40,
+        "cols": 120,
+        "lifetime": 600,
+    }
+    assert (state["starting_capital"], state["ms_per_week"]) == (175, 200)
+    assert [team["name"] for team in state["teams"]] == ["eastbank", "Idlers", "testgremlins"]
+
+    eastbank, idlers, gremlins = state["teams"]
+    assert idlers == {"name": "Idlers", "state": "waiting"}
+    assert eastbank == {
+        "name": "eastbank",
+        "state": "playing",
+        "week": 27,
+        "balance": 175,
+        "hubs": [],
+    }
+    assert (gremlins["state"], gremlins["week"], gremlins["balance"]) == ("playing", 32, 105)
+    assert gremlins["hubs"] == [
+        {"hub_id": "A", "state": "mining", "sector_id": site, "fill": 100},
+        {"hub_id": "B", "state": "idle", "sector_id": None, "fill": 0},
+    ]
+
+
+def test_spectator_data_has_no_tokens(mcp):
+    mcp.ok("startup")
+    for path in ("/spectator/state", "/spectator/belt"):
+        text = mcp.client.get(path).text
+        assert TOKEN not in text and "token" not in text
+
+
+def test_spectator_belt(mcp, scenario):
+    belt = mcp.client.get("/spectator/belt").json()
+    assert (belt["rows"], belt["cols"]) == (40, 120)
+    assert len(belt["ores"]) == len(belt["deposits"]) == 4800
+    assert set(belt["ores"]) == {"X", "Y"}
+    assert belt["deposits"][:50] == [asteroid.deposit for asteroid in scenario.asteroids[:50]]
+
+    # The belt is the scenario belt: it does not change when a team mines.
+    mcp.ok("startup")
+    assert mcp.client.get("/spectator/belt").json() == belt
+
+
+def test_the_spectator_view_moves_idle_teams_forward(mcp, teams, clock):
+    mcp.ok("startup")
+    clock.weeks(250)
+    assert teams.team(TOKEN).world.week == 0
+    assert mcp.client.get("/spectator/state").json()["teams"][0]["week"] == 250
+    clock.weeks(400)
+    team = mcp.client.get("/spectator/state").json()["teams"][0]
+    assert (team["state"], team["week"]) == ("finished", 600)
+
+
+def test_spectator_page(mcp):
+    response = mcp.client.get("/spectator")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "spectator/state" in response.text
+    home = mcp.client.get("/", follow_redirects=False)
+    assert home.status_code == 307 and home.headers["location"] == "/spectator"

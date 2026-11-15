@@ -10,6 +10,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from ol_musky.engine.market import ORE_IDS
+
 COST_ITEMS = ("hub", "deploy", "ship", "move")
 
 
@@ -55,12 +57,15 @@ class Scenario(BaseModel):
         expected = self.rows * self.cols
         if len(self.belt) != expected:
             raise ValueError(f"belt has {len(self.belt)} sectors; rows*cols requires {expected}")
+        unknown = {sector.ore_id for sector in self.belt} - ORE_IDS
+        if unknown:
+            raise ValueError(f"belt has ore types with no market price: {sorted(unknown)}")
         if self.prospecting_offset > self.lifetime:
             raise ValueError("prospecting_offset must not be larger than lifetime")
         return self
 
     def parameters_dict(self) -> dict[str, Any]:
-        """Body of the /mcp/parameters response, as the Django application returned it."""
+        """Body of the /mcp/parameters response."""
         return {
             "lifetime": self.lifetime,
             "rows": self.rows,

@@ -41,7 +41,7 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 100
-extend-exclude = ["admin", "mcp", "src/urls.py", "src/wsgi.py"]
+extend-exclude = ["admin"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

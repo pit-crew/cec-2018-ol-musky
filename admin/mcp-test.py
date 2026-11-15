@@ -10,11 +10,8 @@ fmt = "%Y-%m-%d %H:%M:%S    "
 logfile = open(token + ".log", "w")
 
 uri="http://localhost:8000/mcp"
-# remote host
-#uri = "http://7066414.pythonanywhere.com/mcp"
 
 session = requests.Session()
-session.auth = ('ryehigh', '99PercentReady')
 
 # API ========================================================================
 
@@ -53,7 +50,7 @@ def status_report(print_ledger=False):
         team = report["status_report"]["team"]
         week = int(team["week"])
         if print_ledger:
-            ledger = report["status_report"]["ledger"]
+            ledger = send_request("get_ledger")["ledger"]
             print("Ledger ---------------")
             print(fmt_ledger(ledger))
     except Exception as e:
@@ -63,17 +60,17 @@ def status_report(print_ledger=False):
 def fmt_ledger(ledger):
     if ledger == "":
         return ""
-    report = "\t{:<8} {:<18} {:>8} {:>8} {:>8}\n".format('week', 'item', 'debit', 'credit', 'balance')
+    report = "\t{:<8} {:<18} {:>10} {:>10} {:>10}\n".format('week', 'item', 'debit', 'credit', 'balance')
     bal = 0
 
     for i in range(len(ledger)):
         entry = ledger[i]
         wk = entry["week"]
         item = entry["item"]
-        debit = int(entry["debit"])
-        credit = int(entry["credit"])
+        debit = float(entry["debit"])
+        credit = float(entry["credit"])
         bal = bal - debit + credit
-        report += "\t{:<8} {:<18} {:>8} {:>8} {:>8}\n".format(wk, item, debit, credit, bal)
+        report += "\t{:<8} {:<18} {:>10.2f} {:>10.2f} {:>10.2f}\n".format(wk, item, debit, credit, bal)
     return report
 
 

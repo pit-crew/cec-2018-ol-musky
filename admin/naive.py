@@ -16,14 +16,9 @@ def wprint(msg):
 
 wprint(f"bootstrapping team {token}")
 
-# local
 uri = "http://localhost:8000/mcp"
 
-# remote
-uri = "https://7066414.pythonanywhere.com/mcp"
-
 session = requests.Session()
-session.auth = ('ryehigh', '99PercentReady')
 
 fmt = "%Y-%m-%d %H:%M:%S    "
 logfile = open(token + ".log", "w")
@@ -70,9 +65,9 @@ def get_status():
 
 def get_final():
     report = send_request("final_report")
-    ledger = report["final_report"]
 
     try:
+        ledger = report["final_report"]["ledger"]
         wprint("------------------------------------------------------")
         print(fmt_ledger(ledger))
     except Exception as e:
@@ -105,6 +100,11 @@ def mine_ore(threshold=5):
     hubs = report["hubs"]
     hubs_to_ship = []
 
+    # ship only the hubs that the current balance can pay for
+    balance = int(report["team"]["balance"])
+    ship_rate = params["costs"]["ship"]["rate"]
+    tonnes_to_ship = 0
+
     total_mined = 0
     total_to_ship = 0
     for id, hub in hubs.items():
@@ -113,7 +113,10 @@ def mine_ore(threshold=5):
             mined = sum(ore_amts.values())
             total_mined += mined
             # hubs with < 5% space remaining get shipped
-            if int(hub["active"]) == True and int(hub["space_remaining"]) < threshold:
+            if mined > 0 and int(hub["space_remaining"]) < threshold:
+                if (tonnes_to_ship + mined) * ship_rate / 1000 > balance:
+                    continue
+                tonnes_to_ship += mined
                 hubs_to_ship.append(id)
                 total_to_ship += hub_stats.setdefault(id, mined)
 
@@ -138,17 +141,17 @@ def mine_ore(threshold=5):
 def fmt_ledger(ledger):
     if ledger == "":
         return ""
-    report = "\t{:<8} {:<18} {:>8} {:>8} {:>8}\n".format('week', 'item', 'debit', 'credit', 'balance')
+    report = "\t{:<8} {:<18} {:>10} {:>10} {:>10}\n".format('week', 'item', 'debit', 'credit', 'balance')
     bal = 0
 
     for i in range(len(ledger)):
         entry = ledger[i]
         wk = entry["week"]
         item = entry["item"]
-        debit = int(entry["debit"])
-        credit = int(entry["credit"])
+        debit = float(entry["debit"])
+        credit = float(entry["credit"])
         bal = bal - debit + credit
-        report += "\t{:<8} {:<18} {:>8} {:>8} {:>8}\n".format(wk, item, debit, credit, bal)
+        report += "\t{:<8} {:<18} {:>10.2f} {:>10.2f} {:>10.2f}\n".format(wk, item, debit, credit, bal)
     return report
 
 
@@ -275,13 +278,14 @@ while True:
                 hubs_to_deploy.append(hub["hub_id"])
         hub_num = len(hubs_to_deploy)
         if hub_num > 0:
-            hubs_deployed += hubs_to_deploy
-            hubs_to_deploy = ",".join(hubs_to_deploy)
-            deployed_hubs += hub_num
-
             new_sectors = get_sectors(deployed_hubs, hub_num)
-            # only deploy if hub and sector count match
-            if len(new_sectors.split(",")) == len(hubs_to_deploy.split(",")):
+            # deploy only the hubs for which a sector was found; the others stay in the queue
+            sector_count = len(new_sectors.split(",")) if new_sectors else 0
+            hubs_to_deploy = hubs_to_deploy[:sector_count]
+            if sector_count > 0:
+                hubs_deployed += hubs_to_deploy
+                deployed_hubs += sector_count
+                hubs_to_deploy = ",".join(hubs_to_deploy)
                 wprint(f"deploying hubs {hubs_to_deploy} -> {new_sectors}")
 
                 result = send_request("deploy_hubs", f"hubs={hubs_to_deploy}&sector_ids={new_sectors}")

@@ -1,15 +1,15 @@
 ## Redevelopment (2026)
 
-The MCP is being rebuilt on FastAPI, SQLAlchemy and SQLite in `src/ol_musky/`. The Django code (`mcp/`, `admin/`, `templates/`, `src/urls.py`, `src/wsgi.py`) stays in the repository as the reference for the game rules and the wire format; it is not used by the new server. The bot-facing API described below is being kept unchanged.
+The MCP server is built on FastAPI, SQLAlchemy and SQLite in `src/ol_musky/`. It keeps the bot-facing API of the 2018 competition server, with the differences listed below. `admin/` holds the reference bot and the report tools, and `templates/` holds the tracker and guide pages for Sprint 4.
 
 **Status**
 
 |Sprint|Scope|State|
 |:---:|---|:---:|
 |1|Project skeleton, data layer, scenario loader, `/mcp/parameters`|done|
-|2|Game engine: orders, mining, market, prospecting|next|
-|3|Tick loop and the team endpoints|-|
-|4|Admin endpoints, tracker and guide pages (MVP)|-|
+|2|Game engine: orders, mining, market, prospecting|done|
+|3|Tick loop and the team endpoints|done|
+|4|Admin endpoints, tracker and guide pages (MVP)|next|
 |5-6|Live spectator UI, hardening|-|
 |Sub-project|Update of all tools in `admin/` (after the application is complete)|-|
 
@@ -20,9 +20,12 @@ The server runs on a local machine. Hosting is not decided and is not part of th
 ```sh
 uv sync
 uv run ol-musky load-scenario   # creates db/ol_musky.sqlite3 from config/mcp.yaml and its belt CSV
+uv run ol-musky register-team eastbank   # prints the team's API token
 uv run ol-musky serve           # http://127.0.0.1:8000, interactive API docs at /docs
-curl 'http://127.0.0.1:8000/mcp/parameters?token=anything'
+curl 'http://127.0.0.1:8000/mcp/startup?token=<token>'
 ```
+
+Teams are registered with the CLI while the server is stopped (`ol-musky list-teams` shows them). Each team starts again at week 0 when the server starts; the server does not resume a game. The live state is in memory and is written to the database once per second and at shutdown.
 
 **Development**
 
@@ -39,20 +42,52 @@ uv run alembic revision --autogenerate -m "message"   # after a change to src/ol
 |`OL_MUSKY_DB_PATH`|`db/ol_musky.sqlite3`|SQLite database file|
 |`OL_MUSKY_SCENARIO_FILE`|`config/mcp.yaml`|Scenario loaded by `ol-musky load-scenario`|
 |`OL_MUSKY_SCENARIO_ID`|(the only stored scenario)|Scenario to activate at server start|
+|`OL_MUSKY_FLUSH_INTERVAL_MS`|`1000`|Interval between writes of the live state to the database|
+|`OL_MUSKY_RANDOM_SEED`|(random)|Seed for piracy and prospecting noise|
 
 **Layout**
 
 |Path|Content|
 |---|---|
 |`src/ol_musky/app.py`|FastAPI application factory|
-|`src/ol_musky/api/`|Routers, token check, response envelope|
+|`src/ol_musky/api/`|Team endpoints (`mcp.py`), token and team checks, response envelope, wire formats|
+|`src/ol_musky/world.py`|Live state of all teams, real-time clock, tick|
+|`src/ol_musky/engine/`|Game rules with no I/O: `rules.py` (actions, orders, mining), `market.py`, `prospecting.py`, `grid.py`, `clock.py`, `state.py`|
 |`src/ol_musky/scenario.py`|Scenario model, YAML/CSV loader, active-scenario store|
-|`src/ol_musky/db/`|SQLAlchemy models (same `mcp_*` tables as the Django app), engine, repositories|
+|`src/ol_musky/db/`|SQLAlchemy models (`mcp_*` tables), engine, scenario and team persistence|
 |`src/ol_musky/migrations/`|Alembic migrations|
-|`src/ol_musky/cli.py`|`ol-musky` command: `init-db`, `load-scenario`, `serve`|
+|`src/ol_musky/cli.py`|`ol-musky` command: `init-db`, `load-scenario`, `register-team`, `list-teams`, `serve`|
 |`tests/`|pytest suite|
 
-`db/db.sqlite3` is a Django development snapshot from February 2018 with an older schema. The new server does not read it.
+**Game rules: differences from the 2018 competition server**
+
+The engine (`src/ol_musky/engine/`) keeps the rules, status codes and response bodies of the 2018 server, with these differences:
+
+|Subject|2018 server|This server|
+|---|---|---|
+|Time|State changed only when a team sent a request|Each team moves forward one week at a time. A hub starts to mine the week after its order completes, and ore sells at the price of the arrival week.|
+|Cost rates|Truncated to an integer (`ship: 1.5` charged as 1)|Charged as the scenario states, the same value that `/mcp/parameters` reports|
+|Balance|Truncated to an integer after each shipment, so it drifted from the ledger|Exact; the ledger total always equals the balance|
+|Deploy/move pairing|Sectors were assigned in hub creation order|Hub *n* in the request goes to sector *n* in the request|
+|Build with a hub ID that exists, is repeated, is empty or is longer than 8|Payment taken, no hubs delivered (or a server error)|Rejected with new status `2302`|
+|Deploy/move with a repeated hub ID or an empty list|Server error or `2402`|`2402`|
+|Ship from a hub that is in transit|Hub reported `active: true` with `sector_id: -1`|Hub stays inactive until it arrives|
+|Hub capacity|Applied to each ore type separately, so `space_remaining` could be negative|The total of all ore types; `space_remaining` is 0 to 100|
+|Full hub|Continued to deplete its sectors; the excess ore was lost|Mining stops. The bots take no more than the free space and the deposits keep the remainder.|
+|Sale units|Only full units of 1000 tonnes sold, and revenue was truncated to an integer|Partial units sell; revenue is tonnes x price / 1000|
+|Hubs in transit|A deploy or move did not check their destinations|The destination footprint of a hub in transit is occupied (`2407`)|
+|Reported balance|Integer|Integer, rounded down from the exact balance. The ledger shows the exact amounts.|
+|`get_ledger`, `final_report`|Showed the state as of the team's last action request|Current to the present week (or the last week of the game)|
+|`final_report` content|Team, hubs and pending orders|The same, and the full ledger in the key `ledger`|
+|Request with a missing `hubs`, or a `sector_ids` value that is not a number|Server error (`1101`)|`2302` (build), `2501` (ship), `2404` (deploy/move)|
+|Belt ore types|Any; an ore with no price caused a server error at sale|Scenario load rejects ore types other than X and Y|
+
+Behaviour that is kept as it was, and differs from the competition text below:
+
+- Each team mines its own copy of the belt; teams do not compete for deposits.
+- Each prospect report call makes new random noise, and reports the initial deposits.
+- An uninsured shipment of more than about 166 667 tonnes has a 50 % risk of piracy, which leaves 10-20 % of the ore. Insurance costs 20 % of the shipping cost.
+
 
 ---
 
@@ -203,7 +238,7 @@ Objective scoring is based solely on profit (Revenues - Expenses)
 
 All RESTful calls to the MCP must be HTTP GET and use this format:
 
-`https://7066414.pythonanywhere.com/mcp/[api]?token=[security api token]`
+`http://127.0.0.1:8000/mcp/[api]?token=[security api token]`
 
 All responses from the MCP will be in standard JSON format.
 

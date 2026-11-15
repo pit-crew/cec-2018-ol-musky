@@ -2,14 +2,9 @@ import json
 import sys
 import requests
 
-# local
 uri = "http://localhost:8000/mcp"
 
-# remote
-uri = "https://7066414.pythonanywhere.com/mcp"
-
 session = requests.Session()
-session.auth = ('ryehigh', '99PercentReady')
 
 def send_request(action, parameters=""):
     url = f"{uri}/{action}?token={token}&{parameters}"

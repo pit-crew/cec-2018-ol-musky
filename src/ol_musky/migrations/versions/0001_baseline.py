@@ -1,4 +1,4 @@
-"""Baseline schema, from the Django application's mcp/models.py.
+"""Baseline schema.
 
 Revision ID: 0001
 Revises:

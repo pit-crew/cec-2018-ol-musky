@@ -1,12 +1,17 @@
 """MCP wire envelope: {"<action>": <data>, "status": <code>, "description": <text>}.
 
-The MCP reports all errors in the envelope with HTTP 200, as the Django application did.
+The MCP reports all errors in the envelope, with HTTP 200.
 """
 
+import logging
 from typing import Any
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+
+from ol_musky.engine.rules import RuleError
+
+logger = logging.getLogger("ol_musky")
 
 
 def envelope(action: str, data: Any, status: int = 0, description: str = "") -> JSONResponse:
@@ -24,5 +29,10 @@ class McpError(Exception):
         self.data = {} if data is None else data
 
 
-async def mcp_error_handler(_request: Request, exc: McpError) -> JSONResponse:
+async def mcp_error_handler(_request: Request, exc: McpError | RuleError) -> JSONResponse:
     return envelope(exc.action, exc.data, exc.status, exc.description)
+
+
+async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("unexpected error for %s", request.url.path, exc_info=exc)
+    return envelope("validation", {}, 1101, "internal error")

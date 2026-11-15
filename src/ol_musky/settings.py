@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     scenario_file: Path = Path("config/mcp.yaml")
     # Scenario to activate at start. None selects the only scenario in the database.
     scenario_id: str | None = None
+    # Interval between writes of the live team state to the database.
+    flush_interval_ms: int = 1000
+    # Seed for piracy and prospecting noise. None gives a different game each time.
+    random_seed: int | None = None
 
     @property
     def async_db_url(self) -> str:

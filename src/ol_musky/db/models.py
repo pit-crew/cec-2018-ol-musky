@@ -1,8 +1,7 @@
 """Persistent data model.
 
-Table and column names agree with the Django application (mcp/models.py), thus the
-SQL reports in admin/*.sql continue to operate. The Market table is not kept: the
-market price is a function of the week and has no stored state.
+The SQL reports in admin/*.sql use these table and column names. There is no
+market table: the market price is a function of the week and has no stored state.
 """
 
 from datetime import datetime
@@ -74,7 +73,7 @@ class Team(Base):
     name: Mapped[str] = mapped_column(String(64))
     week: Mapped[int] = mapped_column(Integer)
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    balance: Mapped[int] = mapped_column(Integer)
+    balance: Mapped[float] = mapped_column(Float)
 
 
 class Ledger(Base):

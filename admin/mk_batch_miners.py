@@ -4,14 +4,9 @@ from time import strftime
 from time import sleep
 import json
 
-# local
 uri = "http://localhost:8000/mcp"
 
-# remote
-uri = "http://7066414.pythonanywhere.com/mcp"
-
 session = requests.Session()
-session.auth = ('ryehigh', 'cec__2018')
 
 n = 1
 for i in range(20):

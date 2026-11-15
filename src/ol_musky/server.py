@@ -13,7 +13,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
-from ol_musky import game, league, ledger, placement, reports, spectator
+from ol_musky import admin, belt_files, game, league, ledger, placement, reports, spectator
 from ol_musky.league import League, Team
 from ol_musky.rejection import Rejected, require
 from ol_musky.scenario import read_scenario, read_teams
@@ -246,23 +246,30 @@ async def rejected(request: Request, error: Rejected) -> JSONResponse:
     return envelope(key, data, code, "times up" if code == TIMES_UP else str(error))
 
 
-def create_app(league: League) -> FastAPI:
+def create_app(
+    league: League, scenario_path: Path | None = None, admin_key: str | None = None
+) -> FastAPI:
+    """The application. The admin belt functions need the path of the scenario file."""
     app = FastAPI(title="Ol' Musky MCP")
     app.state.league = league
+    app.state.scenario_path = scenario_path
+    app.state.admin_key = admin_key
+    app.state.loaded_belt = belt_files.selected_belt(scenario_path) if scenario_path else None
     app.add_exception_handler(Rejected, rejected)
     app.include_router(router)
     app.include_router(pages)
+    app.include_router(admin.router)
     return app
 
 
 def app_from_files() -> FastAPI:
     """The application for `uvicorn --factory`. The file paths come from the environment."""
-    scenario = read_scenario(Path(os.environ.get("OL_MUSKY_SCENARIO", "config/mcp.yaml")))
-    this_league = League(scenario)
+    scenario_path = Path(os.environ.get("OL_MUSKY_SCENARIO", "config/mcp.yaml"))
+    this_league = League(read_scenario(scenario_path))
     teams = read_teams(Path(os.environ.get("OL_MUSKY_TEAMS", "config/teams.yaml")))
     for token, name in teams.items():
         this_league.register(token, name)
-    return create_app(this_league)
+    return create_app(this_league, scenario_path, os.environ.get("OL_MUSKY_ADMIN_KEY"))
 
 
 def main() -> None:

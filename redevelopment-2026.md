@@ -26,7 +26,9 @@ The engine follows the dataflow idea of the Lucid language: a value is a stream,
 |5|`reports.py`, `clock.py`|Status, ledger, market, parameters and prospecting views; the clock of a team|done|
 |6|`scenario.py`, `league.py`, `server.py`|Scenario and team files; teams and their clocks; the HTTP API|done|
 |7|`spectator.py`, `pages/spectator.html`|Spectator page: the ore of the belt, the hubs that mine, and a bar chart of the balances, live|done|
-|8|-|Admin functions, guide page, export of results|next|
+|8|`belt.py`|Belt creation: `make_belt(specification, seed)` with exact coverage, total ore and ore Y share; `measure` gives the properties of a belt (hub sites, ore in reach, largest gap)|done|
+|9|`belt_files.py`, `admin.py`, `pages/admin.html`|Admin page for belts: preview a new belt, save it as a CSV file, and select the belt that loads at start|done|
+|10|-|Other admin functions (teams), guide page, export of results|next|
 
 `world.py` holds the immutable values (`World`, `Asteroid`, `Hub`, `Terms`), and `rejection.py` holds the error for a command that breaks a rule. All modules are in `src/ol_musky/`. Piracy and insurance are not in the game at this time.
 
@@ -43,6 +45,8 @@ curl 'http://127.0.0.1:8000/mcp/status_report?token=dev'
 ```
 
 The server reads `config/mcp.yaml` (the scenario and its belt file) and `config/teams.yaml` (API token and name of each team) at start. The environment variables `OL_MUSKY_SCENARIO`, `OL_MUSKY_TEAMS`, `OL_MUSKY_HOST` and `OL_MUSKY_PORT` change the files and the address. The state is in memory only.
+
+**Admin page.** `http://127.0.0.1:8000/admin` makes and manages belts. The settings and the seed give a preview with its measurements. "Save" writes the belt to `config/<name>.csv`; the file has the seed and the settings in comment lines, so that the same belt can be made again, and an existing file is not replaced. "Load at start" changes only the belt file name in `config/mcp.yaml`. The server reads the belt when it starts, so a game in progress keeps its belt; the list shows which belt is in use now and which one loads at the next start. A belt must have the size of the scenario. Access: with `OL_MUSKY_ADMIN_KEY` set, each request needs `?key=<the key>`; with no key, only the computer of the server has access.
 
 **Spectator page.** `http://127.0.0.1:8000/` shows the belt and a bar chart. The belt has a haze of the ore at the start of a game (one colour for each ore type; a larger deposit is larger and brighter), and a dot for each hub that mines, in the colour of its team. Hubs that are idle or in transit are not in the graphic. The bar chart has one bar for each team, for its balance, with the week of the team below its name; a dashed line shows the starting capital. The teams are in the sequence of their names, so that a bar and its colour stay in the same position. After eight teams the colours start again with outlined bars and ring dots, and then with striped bars and rings that have a centre point. Point at a team, or click it, to show only that team in the belt and to see its details. The page reads `/spectator/state` one time each second and `/spectator/belt` one time. The data has no API tokens. The players do not have access to this page during a competition; the server does not restrict access to it.
 

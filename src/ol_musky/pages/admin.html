@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ol' Musky - Admin</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #070b14; --surface: #0e1524; --edge: #1c2740; --grid: #1a2540; --field: #131c30;
+    --text-primary: #e8edf7; --text-secondary: #a3aec6; --text-muted: #6b7896;
+    --accent: #ffb84d; --ok: #5fd38d; --bad: #ff6b6b;
+    --ore-x: rgb(96, 132, 255); --ore-y: rgb(255, 104, 104);
+    --gutter: clamp(12px, 1.6vw, 24px);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: var(--gutter);
+    background: radial-gradient(1200px 600px at 70% -10%, #142042 0%, var(--bg) 60%) fixed, var(--bg);
+    color: var(--text-primary);
+    font: 15px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; gap: var(--gutter);
+  }
+  header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: clamp(20px, 2.2vw, 30px); font-weight: 650; }
+  h1 span { color: var(--accent); }
+  h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+  h2 small { color: var(--text-muted); font-weight: 400; margin-left: 6px; }
+  a { color: var(--text-secondary); }
+  .meta { color: var(--text-secondary); font-size: 14px; }
+  .panel { background: var(--surface); border: 1px solid var(--edge); border-radius: 14px; padding: 14px 16px; }
+  .work { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: var(--gutter); align-items: start; }
+  @media (max-width: 900px) { .work { grid-template-columns: 1fr; } }
+
+  label { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin-bottom: 12px; font-size: 14px; }
+  label output { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  label small { grid-column: 1 / -1; color: var(--text-muted); font-size: 12px; }
+  input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  input[type=number], input[type=text] {
+    background: var(--field); color: var(--text-primary); border: 1px solid var(--edge);
+    border-radius: 8px; padding: 7px 10px; font: inherit; min-width: 0;
+  }
+  button {
+    background: var(--field); color: var(--text-primary); border: 1px solid var(--edge);
+    border-radius: 8px; padding: 7px 14px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--text-muted); }
+  button.main { background: var(--accent); color: #1a1205; border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row input { flex: 1; }
+  .rule { border: 0; border-top: 1px solid var(--edge); margin: 14px 0; }
+
+  canvas { display: block; width: 100%; }
+  .legend { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--text-secondary); font-size: 12px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; margin-left: 12px; }
+  .legend i:first-child { margin-left: 0; }
+  .legend .x { background: var(--ore-x); box-shadow: 0 0 8px var(--ore-x); }
+  .legend .y { background: var(--ore-y); box-shadow: 0 0 8px var(--ore-y); }
+
+  .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 14px 0 0; }
+  .facts div { background: var(--field); border-radius: 10px; padding: 8px 12px; }
+  .facts dt { color: var(--text-secondary); font-size: 12px; }
+  .facts dd { margin: 2px 0 0; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .facts dd small { color: var(--text-muted); font-size: 12px; font-weight: 400; margin-left: 4px; }
+
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 14px 7px 0; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { color: var(--text-secondary); font-weight: 500; font-size: 13px; }
+  th:first-child, td:first-child { text-align: left; }
+  td:last-child { text-align: right; padding-right: 0; }
+  .tag { display: inline-block; font-size: 11px; border-radius: 999px; padding: 1px 8px; margin-left: 6px; border: 1px solid var(--edge); color: var(--text-secondary); }
+  .tag.on { border-color: var(--ok); color: var(--ok); }
+  .tag.next { border-color: var(--accent); color: var(--accent); }
+  .scroll { overflow-x: auto; }
+  #message { min-height: 1.4em; font-size: 14px; color: var(--text-secondary); }
+  #message.ok { color: var(--ok); }
+  #message.bad { color: var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ol' Musky <span>Admin</span></h1>
+  <div class="meta" id="meta"></div>
+  <div style="flex:1"></div>
+  <a href="/spectator">Spectator page</a>
+</header>
+
+<div class="work">
+  <section class="panel">
+    <h2>New belt</h2>
+    <label>Seed <output></output>
+      <span class="row" style="grid-column:1/-1">
+        <input type="number" id="seed" value="1" min="0" step="1">
+        <button type="button" id="reseed">New seed</button>
+      </span>
+      <small>The same settings and seed always give the same belt.</small>
+    </label>
+    <label>Coverage <output for="coverage"></output>
+      <input type="range" id="coverage" min="0.05" max="0.8" step="0.01">
+      <small>The part of the sectors that has ore: sparse to dense.</small>
+    </label>
+    <label>Total ore <output for="total_ore"></output>
+      <input type="range" id="total_ore" min="10" max="200" step="5">
+      <small>Millions of tonnes in the belt.</small>
+    </label>
+    <label>Clusters <output for="clusters"></output>
+      <input type="range" id="clusters" min="1" max="20" step="1">
+    </label>
+    <label>Cluster size <output for="cluster_size"></output>
+      <input type="range" id="cluster_size" min="2" max="14" step="0.5">
+      <small>The typical radius of a cluster, in sectors.</small>
+    </label>
+    <label>Ore Y share <output for="y_share"></output>
+      <input type="range" id="y_share" min="0" max="0.5" step="0.01">
+      <small>The part of the ore that is ore Y. It is in veins.</small>
+    </label>
+    <label>Roughness <output for="roughness"></output>
+      <input type="range" id="roughness" min="0" max="1.5" step="0.05">
+      <small>0 gives smooth clusters. More gives irregular deposits.</small>
+    </label>
+    <hr class="rule">
+    <h2>Save this belt</h2>
+    <div class="row">
+      <input type="text" id="name" placeholder="name, for example final-2026" maxlength="40">
+      <button type="button" class="main" id="save">Save</button>
+    </div>
+    <p id="message"></p>
+  </section>
+
+  <section class="panel">
+    <h2 id="title">Preview</h2>
+    <canvas id="belt" aria-label="The ore of the belt"></canvas>
+    <div class="legend"><i class="x"></i>ore X<i class="y"></i>ore Y &middot; a larger deposit is larger and brighter</div>
+    <dl class="facts" id="facts"></dl>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>Saved belts <small id="folder"></small></h2>
+  <div class="scroll">
+    <table>
+      <thead><tr>
+        <th>Belt</th><th>Coverage</th><th>Total ore</th><th>Ore Y</th><th>Largest deposit</th>
+        <th>Good hub sites</th><th>Ore in reach</th><th>Seed</th><th></th>
+      </tr></thead>
+      <tbody id="belts"></tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+"use strict";
+const ORE_RGB = { X: "96, 132, 255", Y: "255, 104, 104" };
+const FIELDS = ["coverage", "total_ore", "clusters", "cluster_size", "y_share", "roughness"];
+const DEFAULTS = { coverage: 0.4, total_ore: 80, clusters: 7, cluster_size: 6, y_share: 0.11, roughness: 0.6 };
+const key = new URLSearchParams(location.search).get("key");
+const $ = (id) => document.getElementById(id);
+const canvas = $("belt"), ctx = canvas.getContext("2d");
+let shown = null;        // the belt in the preview
+let fromSettings = true; // false when the preview shows a saved belt
+
+const make = (tag, className, text) => {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+};
+const whole = (value) => Math.round(value).toLocaleString("en-CA");
+const percent = (value) => Math.round(value * 100) + " %";
+const millions = (tonnes) => (tonnes / 1e6).toLocaleString("en-CA", { maximumFractionDigits: 1 }) + " M t";
+const SHOW = {
+  coverage: (v) => percent(v), total_ore: (v) => v + " M t", clusters: (v) => v,
+  cluster_size: (v) => v + " sectors", y_share: (v) => percent(v), roughness: (v) => Number(v).toFixed(2),
+};
+
+function api(path, params) {
+  const url = new URL(path, location.href);
+  for (const [name, value] of Object.entries(params ?? {})) url.searchParams.set(name, value);
+  if (key) url.searchParams.set("key", key);
+  return url;
+}
+async function call(path, params, body) {
+  const options = body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {};
+  const response = await fetch(api(path, params), options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail ?? ("error " + response.status));
+  return data;
+}
+function say(text, kind) { $("message").textContent = text; $("message").className = kind ?? ""; }
+
+function settings() {
+  const values = { seed: Number($("seed").value) || 0 };
+  for (const id of FIELDS) values[id] = Number($(id).value);
+  values.total_ore = Math.round(values.total_ore * 1e6);
+  return values;
+}
+function showSettings() {
+  for (const id of FIELDS) document.querySelector(`output[for=${id}]`).textContent = SHOW[id]($(id).value);
+}
+
+// --- The preview -----------------------------------------------------------------------
+
+function draw() {
+  if (!shown) return;
+  const width = canvas.clientWidth, cell = width / shown.cols, height = cell * shown.rows;
+  const ratio = window.devicePixelRatio || 1;
+  canvas.style.height = height + "px";
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.globalCompositeOperation = "lighter";
+  const largest = shown.deposits.reduce((a, b) => Math.max(a, b), 1);
+  shown.deposits.forEach((deposit, sector) => {
+    if (deposit <= 0) return;
+    const share = deposit / largest;
+    const x = (sector % shown.cols + 0.5) * cell, y = (Math.floor(sector / shown.cols) + 0.5) * cell;
+    const radius = cell * (0.8 + 1.5 * Math.sqrt(share));
+    const rgb = ORE_RGB[shown.ores[sector]] ?? "200, 200, 200";
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    glow.addColorStop(0, `rgba(${rgb}, ${0.04 + 0.2 * share})`);
+    glow.addColorStop(1, `rgba(${rgb}, 0)`);
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+  });
+}
+
+function fact(term, value, note) {
+  const box = make("div"), detail = make("dd", "", value);
+  if (note) detail.append(make("small", "", note));
+  box.append(make("dt", "", term), detail);
+  return box;
+}
+function showFacts(report) {
+  $("facts").replaceChildren(
+    fact("Coverage", percent(report.coverage)),
+    fact("Total ore", millions(report.total_ore)),
+    fact("Ore Y share", percent(report.y_share)),
+    fact("Largest deposit", whole(report.largest_deposit), "t"),
+    fact("Typical deposit", whole(report.median_deposit), "t"),
+    fact("Good hub sites", whole(report.good_sites), "of " + whole(report.sites)),
+    fact("Best site", report.best_site_loads.toFixed(0), "hub loads"),
+    fact("Typical good site", report.median_site_loads.toFixed(0), "hub loads"),
+    fact("Best site lasts", report.best_site_weeks.toFixed(0), "weeks"),
+    fact("Ore in reach of hubs", percent(report.ore_in_reach)),
+    fact("Largest gap", report.largest_gap, "sectors square"),
+    fact("Ore in left half", percent(report.left_share)),
+  );
+}
+
+let pending = 0;
+async function preview() {
+  showSettings();
+  const mine = ++pending;
+  try {
+    const belt = await call("admin/belt/preview", settings());
+    if (mine !== pending) return;   // a newer request is on its way
+    shown = belt; fromSettings = true;
+    $("title").textContent = "Preview: new belt, seed " + belt.seed;
+    $("save").disabled = false;
+    draw(); showFacts(belt.report);
+  } catch (error) { say(error.message, "bad"); }
+}
+
+// --- The saved belts -------------------------------------------------------------------
+
+async function listBelts() {
+  const data = await call("admin/belts");
+  $("folder").textContent = "the server loads the belt with the mark \"loads at start\" when it starts";
+  const rows = data.belts.map((belt) => {
+    const row = make("tr"), name = make("td", "", belt.name);
+    if (belt.name === data.loaded) name.append(make("span", "tag on", "in use now"));
+    if (belt.name === data.selected) name.append(make("span", "tag next", "loads at start"));
+    const report = belt.report;
+    const view = make("button", "", "View"), select = make("button", "", "Load at start");
+    view.disabled = select.disabled = !belt.fits;
+    select.disabled ||= belt.name === data.selected;
+    view.addEventListener("click", () => viewSaved(belt.name));
+    select.addEventListener("click", () => selectBelt(belt.name));
+    const actions = make("td");
+    actions.append(view, " ", select);
+    row.append(
+      name,
+      make("td", "", report ? percent(report.coverage) : "-"),
+      make("td", "", report ? millions(report.total_ore) : "-"),
+      make("td", "", report ? percent(report.y_share) : "-"),
+      make("td", "", report ? whole(report.largest_deposit) : "-"),
+      make("td", "", report ? whole(report.good_sites) : "-"),
+      make("td", "", report ? percent(report.ore_in_reach) : "-"),
+      make("td", "", belt.origin ? belt.origin.seed : (belt.fits ? "-" : whole(belt.sectors) + " sectors: wrong size")),
+      actions,
+    );
+    return row;
+  });
+  $("belts").replaceChildren(...rows);
+}
+
+async function viewSaved(name) {
+  try {
+    const belt = await call("admin/belt/saved", { name });
+    shown = belt; fromSettings = false;
+    $("title").textContent = "Preview: saved belt " + name;
+    $("save").disabled = true;
+    draw(); showFacts(belt.report);
+    say("The preview shows the saved belt \"" + name + "\". Change a setting to go back to a new belt.");
+  } catch (error) { say(error.message, "bad"); }
+}
+
+async function selectBelt(name) {
+  try {
+    await call("admin/belt/select", null, { name });
+    say("\"" + name + "\" loads when the server starts again.", "ok");
+    await listBelts();
+  } catch (error) { say(error.message, "bad"); }
+}
+
+async function saveBelt() {
+  const name = $("name").value.trim();
+  if (!name) { say("Give the belt a name.", "bad"); return; }
+  try {
+    const result = await call("admin/belt/save", null, { ...settings(), name });
+    say("Saved as " + result.saved + ".", "ok");
+    $("name").value = "";
+    await listBelts();
+  } catch (error) { say(error.message, "bad"); }
+}
+
+// --- Start -----------------------------------------------------------------------------
+
+for (const id of FIELDS) { $(id).value = DEFAULTS[id]; $(id).addEventListener("input", preview); }
+$("seed").addEventListener("input", preview);
+$("reseed").addEventListener("click", () => { $("seed").value = Math.floor(Math.random() * 1e6); preview(); });
+$("save").addEventListener("click", saveBelt);
+window.addEventListener("resize", draw);
+preview();
+listBelts().catch((error) => say(error.message, "bad"));
+</script>
+</body>
+</html>

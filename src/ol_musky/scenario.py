@@ -1,7 +1,8 @@
 """Scenario files: the constants and the belt of a game.
 
 A scenario is a YAML file (see config/mcp.yaml) that names a belt file. The belt
-file has one line for each sector, `ore,deposit`, row by row.
+file has one line for each sector, `ore,deposit`, row by row. Lines that start
+with `#` are comments.
 """
 
 from dataclasses import dataclass
@@ -28,7 +29,8 @@ class Scenario:
 
 
 def read_belt(path: Path) -> tuple[Asteroid, ...]:
-    lines = [line.split(",") for line in path.read_text().splitlines() if line.strip()]
+    rows = [line for line in path.read_text().splitlines() if line.strip()]
+    lines = [line.split(",") for line in rows if not line.startswith("#")]
     return tuple(Asteroid(ore.strip(), int(deposit)) for ore, deposit in lines)
 
 

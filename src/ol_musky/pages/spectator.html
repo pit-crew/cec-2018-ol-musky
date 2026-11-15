@@ -55,7 +55,7 @@
   .legend i:first-child { margin-left: 0; }
   .legend .x { background: var(--ore-x); box-shadow: 0 0 8px var(--ore-x); }
   .legend .y { background: var(--ore-y); box-shadow: 0 0 8px var(--ore-y); }
-  .legend .hub { border-radius: 3px; border: 1.5px solid var(--text-secondary); }
+  .legend .hub { background: var(--text-secondary); }
 
   /* --- The bar chart: one bar for each team, one axis (the balance) --- */
   .chart { position: relative; }
@@ -244,38 +244,37 @@ function drawBelt() {
 }
 
 function drawHub(hub, look, cell, alpha) {
-  const { rows, cols } = state;
-  const row = Math.floor(hub.sector_id / cols);
-  const col = hub.sector_id % cols;
-  // The footprint: the hub's sector and the adjacent sectors, inside the belt.
-  const left = Math.max(col - 1, 0), right = Math.min(col + 1, cols - 1);
-  const top = Math.max(row - 1, 0), bottom = Math.min(row + 1, rows - 1);
-  const x = left * cell + 0.5, y = top * cell + 0.5;
-  const w = (right - left + 1) * cell - 1, h = (bottom - top + 1) * cell - 1;
+  // One dot for each hub, at the sector of the hub.
+  const x = (hub.sector_id % state.cols + 0.5) * cell;
+  const y = (Math.floor(hub.sector_id / state.cols) + 0.5) * cell;
+  const radius = Math.max(3, cell * 0.42);
+  const line = Math.max(1.5, radius * 0.4);
 
   ctx.save();
+  ctx.globalAlpha = alpha;
+  // A dark ring keeps the dot clear on top of the haze and of other dots.
   ctx.beginPath();
-  ctx.roundRect(x, y, w, h, Math.min(cell * 0.45, 5));
-  ctx.globalAlpha = alpha * 0.6;        // a dark base keeps the hub clear on top of the haze
+  ctx.arc(x, y, radius + 1.5, 0, Math.PI * 2);
   ctx.fillStyle = "#070b14";
   ctx.fill();
-  if (look.variant === "filled") {
-    ctx.globalAlpha = alpha * 0.35;
-    ctx.fillStyle = look.colour;
-    ctx.fill();
-  }
-  ctx.globalAlpha = alpha;
-  ctx.lineWidth = Math.max(1.5, cell * 0.14);
-  ctx.strokeStyle = look.colour;
-  if (look.variant === "striped") ctx.setLineDash([cell * 0.45, cell * 0.3]);
-  ctx.stroke();
-  ctx.setLineDash([]);
 
-  // The hub itself, at the centre sector.
-  ctx.beginPath();
-  ctx.arc(col * cell + cell / 2, row * cell + cell / 2, Math.max(1.5, cell * 0.32), 0, Math.PI * 2);
   ctx.fillStyle = look.colour;
-  if (look.variant === "hollow") ctx.stroke(); else ctx.fill();
+  ctx.strokeStyle = look.colour;
+  ctx.lineWidth = line;
+  ctx.beginPath();
+  if (look.variant === "filled") {
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Teams after the eighth: a ring, and then a ring with a centre point.
+    ctx.arc(x, y, radius - line / 2, 0, Math.PI * 2);
+    ctx.stroke();
+    if (look.variant === "striped") {
+      ctx.beginPath();
+      ctx.arc(x, y, radius * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }
 

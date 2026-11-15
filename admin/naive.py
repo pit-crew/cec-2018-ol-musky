@@ -1,3 +1,45 @@
+"""A naive mining bot for the MCP.
+
+Usage:  python naive.py <team token>
+The bot writes the log of its requests to <team token>.log.
+
+Strategy: spend all spare money on hubs, put them on sectors that the surveys
+show as rich, ship each hub when it is full, and never move a hub.
+
+One loop for each MCP week (a pause of 0.9 week), until the MCP says "times up":
+
+1. BUILD. Calculate how many hubs the spare balance can pay for, where one hub
+   costs its build, its deploy, and one shipment of a full hub. Build that
+   number. Add the deploy cost and one shipment cost of each new hub to a cash
+   reserve, so that the bot can always deploy a hub and ship its first load.
+   Stop building after 72 % of the game: a later hub cannot pay for itself.
+
+2. DEPLOY. Send each idle hub to a sector that is selected at random from the
+   candidate sectors. The bot keeps its own list of occupied sectors (each hub
+   sector and its 8 adjacent sectors) and uses only sectors with a full ring of
+   8 that does not touch that list. If there are fewer candidates than idle
+   hubs, the other hubs wait.
+
+3. PROSPECT. Each 7th week, or when no candidates remain, read the prospect
+   report. Each sector with an estimate above 35 000 tonnes becomes a
+   candidate. The hub goes to the sector immediately after the candidate, so
+   that the candidate is one of the 8 sectors that the hub mines.
+
+4. SHIP. Read the status report. Ship each hub that mines and has less than 5 %
+   of its space free, if the balance can pay for the shipment.
+
+5. END GAME. When the time that remains is less than the shipping time plus 3
+   weeks, ship all hubs with ore one last time and stop.
+
+Then print the ledger from the final report.
+
+Known weaknesses:
+- It builds more hubs than there are candidate sectors, so many hubs stay idle.
+- It does not move a hub when the ore around it is gone.
+- It selects sectors from single estimates, not from the total of the 8 sectors.
+- It does not use the market report: it ships at any price.
+"""
+
 import json
 import random
 import sys
@@ -108,8 +150,8 @@ def mine_ore(threshold=5):
     total_mined = 0
     total_to_ship = 0
     for id, hub in hubs.items():
-        if hub["active"]:
-            ore_amts = json.loads(hub["amt"])
+        if hub["state"] == "mining":
+            ore_amts = hub["amt"]
             mined = sum(ore_amts.values())
             total_mined += mined
             # hubs with < 5% space remaining get shipped
@@ -187,7 +229,7 @@ built_hubs = 0
 last_built_hubs = 0
 
 # total cost build, deploy hub, ship hub
-total_cost = params["costs"]["hub"]["rate"] + params["costs"]["deploy"]["rate"] + (
+total_cost = params["costs"]["build"]["rate"] + params["costs"]["deploy"]["rate"] + (
         HUB_CAPACITY * params["costs"]["ship"]["rate"]) / 1000
 
 # cash to hold back per hub to ship the ore
@@ -274,7 +316,7 @@ while True:
     if len(hubs) > 0:
         hubs_to_deploy = []
         for hub in hubs.values():
-            if hub["sector_id"] == -1 and not hub["hub_id"] in hubs_deployed:
+            if hub["state"] == "idle" and not hub["hub_id"] in hubs_deployed:
                 hubs_to_deploy.append(hub["hub_id"])
         hub_num = len(hubs_to_deploy)
         if hub_num > 0:

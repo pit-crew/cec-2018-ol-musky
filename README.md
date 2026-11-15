@@ -11,7 +11,7 @@ Your mandate is to develop an autonomous asteroid mining system (AI) that makes 
 Starting with \$175,000,000 of capital, your AI will interface with Ol' Musky's **Master Control Program (MCP)** which will carry out your instructions and queries for **all** phases of your mining operation. Your AI will be responsible for building and deploying robotic mining hubs in the asteroid belt between Mars and Jupiter and shipping the ore back to Earth. Your task is basically engineering a Supply Chain Management AI. Easy, eh?
 
 ![Ore Deposit Sample](static/belt-sample.png)
-**Fig 1. Sample distribution of ore deposits**
+**Fig 1. Sample distribution of ore deposits. Blue is ore X and red is ore Y; a larger deposit is larger and brighter.**
 
 ### Operations (What your AI will do)
 
@@ -51,7 +51,7 @@ All communication with the MCP is done through its RESTful API. Your code can be
   - Using the /mcp/prospect_report API function, your AI will get data from on-going geological surveys and test bore-holes in the asteroid belt. The report is a list of sectors, the ore type found and an estimate of size of ore deposit in each sector. However, each report contains only a subset of the total sectors
   - A new report is available every 85 MCP weeks progressively covering more of the belt.
     ![Prospecting Report](static/prospect_report-0.png "Prospecting Report")
-    **Fig 2. Example of one prospect report - a diagonal exploratory "pass"**
+    **Fig 2. Example of one prospect report - a diagonal exploratory "pass". A larger dot is a larger estimate.**
     ![Prospecting Report](static/prospect_report.png "Prospecting Report")
     **Fig 3. Each colour represents a separate prospecting report pass (7 in all)**
 
@@ -564,7 +564,7 @@ If this is your first time making get requests; checkout the following language 
 
 ##### Example Hub placement showing adjacent sectors (Cartesian co-ordinates)
 
-![Example Hub Placement](static/example-graphic.gif)
+![Example Hub Placement](static/hub-placement.png)
 
 #### MCP Response Status Codes
 

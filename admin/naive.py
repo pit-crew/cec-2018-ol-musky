@@ -33,7 +33,7 @@ One loop for each MCP week (a pause of 0.9 week), until the MCP says "times up":
 
 Then print the ledger from the final report.
 
-Known weaknesses:
+Why this is naive:
 - It builds more hubs than there are candidate sectors, so many hubs stay idle.
 - It does not move a hub when the ore around it is gone.
 - It selects sectors from single estimates, not from the total of the 8 sectors.

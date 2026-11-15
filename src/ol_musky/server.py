@@ -5,18 +5,32 @@ Each response is JSON: {"<action>": <data>, "status": <code>, "description": <te
 with HTTP status 200. Status 0 is success.
 """
 
+import logging
 import os
 from collections import Counter
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, FastAPI, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
-from ol_musky import admin, belt_files, game, league, ledger, placement, reports, spectator
+from ol_musky import (
+    admin,
+    belt_files,
+    game,
+    league,
+    ledger,
+    placement,
+    reports,
+    results,
+    spectator,
+)
 from ol_musky.league import League, Team
 from ol_musky.rejection import Rejected, require
 from ol_musky.scenario import read_scenario, read_teams
+
+logger = logging.getLogger("ol_musky")
 
 TOKEN_REQUIRED = "token required - see competition coordinator"
 BAD_TOKEN = "token must be 32 or fewer alpha-numerics"
@@ -247,10 +261,36 @@ async def rejected(request: Request, error: Rejected) -> JSONResponse:
 
 
 def create_app(
-    league: League, scenario_path: Path | None = None, admin_key: str | None = None
+    league: League,
+    scenario_path: Path | None = None,
+    admin_key: str | None = None,
+    results_path: Path | None = None,
 ) -> FastAPI:
-    """The application. The admin belt functions need the path of the scenario file."""
-    app = FastAPI(title="Ol' Musky MCP")
+    """The application.
+
+    The admin belt functions need the path of the scenario file. With a results
+    path, the server writes each game to that database: when the game ends, and
+    for the games that did not end, when the server stops.
+    """
+
+    def export(team: Team) -> None:
+        try:
+            results.export_team(
+                results_path, team, league.scenario, league.is_finished(team), league.clock()
+            )
+        except Exception:
+            logger.exception("export of the game of team %s failed", team.name)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        yield
+        if results_path:
+            for team in league.unreported():
+                export(team)
+
+    if results_path:
+        league.on_finish = export
+    app = FastAPI(title="Ol' Musky MCP", lifespan=lifespan)
     app.state.league = league
     app.state.scenario_path = scenario_path
     app.state.admin_key = admin_key
@@ -269,7 +309,13 @@ def app_from_files() -> FastAPI:
     teams = read_teams(Path(os.environ.get("OL_MUSKY_TEAMS", "config/teams.yaml")))
     for token, name in teams.items():
         this_league.register(token, name)
-    return create_app(this_league, scenario_path, os.environ.get("OL_MUSKY_ADMIN_KEY"))
+    results_path = os.environ.get("OL_MUSKY_RESULTS", "results/ol-musky.sqlite3")
+    return create_app(
+        this_league,
+        scenario_path,
+        os.environ.get("OL_MUSKY_ADMIN_KEY"),
+        Path(results_path) if results_path else None,
+    )
 
 
 def main() -> None:

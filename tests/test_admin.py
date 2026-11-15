@@ -13,7 +13,7 @@ from ol_musky.league import League
 from ol_musky.scenario import read_belt, read_scenario
 from ol_musky.server import create_app
 
-CONFIG = Path(__file__).resolve().parent.parent / "config"
+CONFIG = Path(__file__).resolve().parent / "data"
 KEY = "s3cret-key"
 SPEC = BeltSpec()
 

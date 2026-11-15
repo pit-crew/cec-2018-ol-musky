@@ -12,7 +12,7 @@ from ol_musky.rejection import Rejected
 from ol_musky.scenario import read_scenario, read_teams
 from ol_musky.server import create_app
 
-CONFIG = Path(__file__).resolve().parent.parent / "config"
+CONFIG = Path(__file__).resolve().parent / "data"
 TOKEN = "71a653928dc1152537d002cd1349f0d4"
 
 

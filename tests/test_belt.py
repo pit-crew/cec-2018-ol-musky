@@ -211,7 +211,7 @@ def test_measure_agrees_with_the_targets_of_the_specification():
 
 
 def test_measure_the_belt_of_2018():
-    belt = read_belt(Path(__file__).resolve().parent.parent / "config" / "belt_map-dev.csv")
+    belt = read_belt(Path(__file__).resolve().parent / "data" / "belt_map-dev.csv")
     report = measure(belt, cols=120, rate=383, hub_capacity=25000)
     assert report.coverage == pytest.approx(0.229, abs=0.001)
     assert (report.total_ore, report.largest_deposit) == (80_789_916, 137_244)

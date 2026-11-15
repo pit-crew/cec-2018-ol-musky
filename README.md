@@ -1,93 +1,37 @@
 ## Redevelopment (2026)
 
-The MCP server is built on FastAPI, SQLAlchemy and SQLite in `src/ol_musky/`. It keeps the bot-facing API of the 2018 competition server, with the differences listed below. `admin/` holds the reference bot and the report tools, and `templates/` holds the tracker and guide pages for Sprint 4.
+The game server is being built again from an empty start, one layer at a time. Each layer has its own tests and depends only on the layers before it. The competition text and the API specification below describe the 2018 game; the new server does not supply the API yet.
+
+**Design**
+
+The engine follows the dataflow idea of the Lucid language: a value is a stream, and an operation applies to streams point by point.
+
+- The belt is a stream of asteroids; the index is the sector ID.
+- `miners` is a sparse stream in parallel with the belt: at each sector, the hub of each bot that is there.
+- A world is the state of one player in one week. Each player has their own world.
+- `sweep(world)` gives the world of the next week. It goes along the asteroid stream and mines with each bot that it finds. `weeks(world)` is the stream of worlds.
+- State is where things are. A hub mines because its bots are in `miners`; there are no status flags, and the sweep has no conditional statements. The limits are arithmetic: a bot takes the minimum of its rate, the deposit, and the free space of its hub.
+- All values are immutable. A command or a sweep returns a new world.
 
 **Status**
 
-|Sprint|Scope|State|
-|:---:|---|:---:|
-|1|Project skeleton, data layer, scenario loader, `/mcp/parameters`|done|
-|2|Game engine: orders, mining, market, prospecting|done|
-|3|Tick loop and the team endpoints|done|
-|4|Admin endpoints, tracker and guide pages (MVP)|next|
-|5-6|Live spectator UI, hardening|-|
-|Sub-project|Update of all tools in `admin/` (after the application is complete)|-|
+|Layer|Module|Scope|State|
+|:---:|---|---|:---:|
+|1|`src/ol_musky/sweep.py`|Mining: asteroids, hubs, bots, the weekly sweep|done|
+|2|placement|Belt geometry; commands that put bots into the belt and take them out; placement rules|next|
+|3|timeline|Events by week: hub delivery, hub arrival, ore sale|-|
+|4|money|Ledger, costs, market prices, the game commands|-|
+|5|server|HTTP API, clock, team registration, spectator page|-|
 
-The server runs on a local machine. Hosting is not decided and is not part of the current plan.
+The tools in `admin/` and the pages in `templates/` are from the 2018 server. They stay unchanged until the application is complete.
 
-**Quick start** (requires [uv](https://docs.astral.sh/uv/) and Python 3.12)
+**Development** (requires [uv](https://docs.astral.sh/uv/) and Python 3.12)
 
 ```sh
 uv sync
-uv run ol-musky load-scenario   # creates db/ol_musky.sqlite3 from config/mcp.yaml and its belt CSV
-uv run ol-musky register-team eastbank   # prints the team's API token
-uv run ol-musky serve           # http://127.0.0.1:8000, interactive API docs at /docs
-curl 'http://127.0.0.1:8000/mcp/startup?token=<token>'
-```
-
-Teams are registered with the CLI while the server is stopped (`ol-musky list-teams` shows them). Each team starts again at week 0 when the server starts; the server does not resume a game. The live state is in memory and is written to the database once per second and at shutdown.
-
-**Development**
-
-```sh
 uv run pytest
-uv run ruff check . && uv run ruff format --check src/ol_musky tests
-uv run alembic revision --autogenerate -m "message"   # after a change to src/ol_musky/db/models.py
+uv run ruff check . && uv run ruff format --check src tests
 ```
-
-**Configuration** (environment variables)
-
-|Variable|Default|Purpose|
-|---|---|---|
-|`OL_MUSKY_DB_PATH`|`db/ol_musky.sqlite3`|SQLite database file|
-|`OL_MUSKY_SCENARIO_FILE`|`config/mcp.yaml`|Scenario loaded by `ol-musky load-scenario`|
-|`OL_MUSKY_SCENARIO_ID`|(the only stored scenario)|Scenario to activate at server start|
-|`OL_MUSKY_FLUSH_INTERVAL_MS`|`1000`|Interval between writes of the live state to the database|
-|`OL_MUSKY_RANDOM_SEED`|(random)|Seed for piracy and prospecting noise|
-
-**Layout**
-
-|Path|Content|
-|---|---|
-|`src/ol_musky/app.py`|FastAPI application factory|
-|`src/ol_musky/api/`|Team endpoints (`mcp.py`), token and team checks, response envelope, wire formats|
-|`src/ol_musky/world.py`|Live state of all teams, real-time clock, tick|
-|`src/ol_musky/engine/`|Game rules with no I/O: `rules.py` (actions, orders, mining), `market.py`, `prospecting.py`, `grid.py`, `clock.py`, `state.py`|
-|`src/ol_musky/scenario.py`|Scenario model, YAML/CSV loader, active-scenario store|
-|`src/ol_musky/db/`|SQLAlchemy models (`mcp_*` tables), engine, scenario and team persistence|
-|`src/ol_musky/migrations/`|Alembic migrations|
-|`src/ol_musky/cli.py`|`ol-musky` command: `init-db`, `load-scenario`, `register-team`, `list-teams`, `serve`|
-|`tests/`|pytest suite|
-
-**Game rules: differences from the 2018 competition server**
-
-The engine (`src/ol_musky/engine/`) keeps the rules, status codes and response bodies of the 2018 server, with these differences:
-
-|Subject|2018 server|This server|
-|---|---|---|
-|Time|State changed only when a team sent a request|Each team moves forward one week at a time. A hub starts to mine the week after its order completes, and ore sells at the price of the arrival week.|
-|Cost rates|Truncated to an integer (`ship: 1.5` charged as 1)|Charged as the scenario states, the same value that `/mcp/parameters` reports|
-|Balance|Truncated to an integer after each shipment, so it drifted from the ledger|Exact; the ledger total always equals the balance|
-|Deploy/move pairing|Sectors were assigned in hub creation order|Hub *n* in the request goes to sector *n* in the request|
-|Build with a hub ID that exists, is repeated, is empty or is longer than 8|Payment taken, no hubs delivered (or a server error)|Rejected with new status `2302`|
-|Deploy/move with a repeated hub ID or an empty list|Server error or `2402`|`2402`|
-|Ship from a hub that is in transit|Hub reported `active: true` with `sector_id: -1`|Hub stays inactive until it arrives|
-|Hub capacity|Applied to each ore type separately, so `space_remaining` could be negative|The total of all ore types; `space_remaining` is 0 to 100|
-|Full hub|Continued to deplete its sectors; the excess ore was lost|Mining stops. The bots take no more than the free space and the deposits keep the remainder.|
-|Sale units|Only full units of 1000 tonnes sold, and revenue was truncated to an integer|Partial units sell; revenue is tonnes x price / 1000|
-|Hubs in transit|A deploy or move did not check their destinations|The destination footprint of a hub in transit is occupied (`2407`)|
-|Reported balance|Integer|Integer, rounded down from the exact balance. The ledger shows the exact amounts.|
-|`get_ledger`, `final_report`|Showed the state as of the team's last action request|Current to the present week (or the last week of the game)|
-|`final_report` content|Team, hubs and pending orders|The same, and the full ledger in the key `ledger`|
-|Request with a missing `hubs`, or a `sector_ids` value that is not a number|Server error (`1101`)|`2302` (build), `2501` (ship), `2404` (deploy/move)|
-|Belt ore types|Any; an ore with no price caused a server error at sale|Scenario load rejects ore types other than X and Y|
-
-Behaviour that is kept as it was, and differs from the competition text below:
-
-- Each team mines its own copy of the belt; teams do not compete for deposits.
-- Each prospect report call makes new random noise, and reports the initial deposits.
-- An uninsured shipment of more than about 166 667 tonnes has a 50 % risk of piracy, which leaves 10-20 % of the ore. Insurance costs 20 % of the shipping cost.
-
 
 ---
 

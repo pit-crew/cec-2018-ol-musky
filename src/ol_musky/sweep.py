@@ -26,38 +26,10 @@ Thus this module has no conditional statements, and all values are immutable:
 """
 
 from collections import Counter
-from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field, replace
+from collections.abc import Callable, Iterator
+from dataclasses import replace
 
-
-@dataclass(frozen=True, slots=True)
-class Asteroid:
-    """One element of the belt stream."""
-
-    ore: str
-    deposit: int  # tonnes that remain
-
-
-@dataclass(frozen=True, slots=True)
-class Hub:
-    capacity: int  # tonnes, the total of all ore types
-    hold: Counter[str] = field(default_factory=Counter)  # tonnes of each ore type
-
-    @property
-    def free(self) -> int:
-        return self.capacity - sum(self.hold.values())
-
-
-@dataclass(frozen=True, slots=True)
-class World:
-    """The mining state of one player in one week."""
-
-    asteroids: tuple[Asteroid, ...]  # the belt: index = sector ID
-    hubs: Mapping[str, Hub] = field(default_factory=dict)  # key = hub ID
-    # Sparse, parallel to `asteroids`: sector ID -> the hub ID of each bot at that sector.
-    miners: Mapping[int, tuple[str, ...]] = field(default_factory=dict)
-    rate: int = 0  # tonnes that one bot mines in one week
-    week: int = 0
+from ol_musky.world import Asteroid, Hub, World
 
 
 def dig(asteroid: Asteroid, hub: Hub, rate: int) -> tuple[Asteroid, Hub]:
@@ -79,8 +51,8 @@ def sweep(world: World) -> World:
     return replace(world, asteroids=tuple(asteroids), hubs=hubs, week=world.week + 1)
 
 
-def weeks(world: World) -> Iterator[World]:
-    """The stream of worlds from the given world: world, sweep(world), sweep(sweep(world)), ..."""
+def weeks(world: World, step: Callable[[World], World] = sweep) -> Iterator[World]:
+    """The stream of worlds from the given world: world, step(world), step(step(world)), ..."""
     while True:
         yield world
-        world = sweep(world)
+        world = step(world)

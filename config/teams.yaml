@@ -1,0 +1,3 @@
+# Teams of the local server: API token -> team name.
+# A token has 32 or fewer characters: letters, digits, "-" and "_".
+dev: developer

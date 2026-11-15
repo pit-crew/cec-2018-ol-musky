@@ -1,6 +1,6 @@
 ## Redevelopment (2026)
 
-The game server is being built again from an empty start, one layer at a time. Each layer has its own tests and depends only on the layers before it. The competition text and the API specification below describe the 2018 game; the new server does not supply the API yet.
+The game server is being built again from an empty start, one layer at a time. Each layer has its own tests and depends only on the layers before it. The competition text and the API specification below describe the 2018 game. The new server supplies that API; the response examples below are not yet updated where the content differs.
 
 **Design**
 
@@ -17,18 +17,33 @@ The engine follows the dataflow idea of the Lucid language: a value is a stream,
 
 |Layer|Module|Scope|State|
 |:---:|---|---|:---:|
-|1|`src/ol_musky/sweep.py`|Mining: asteroids, hubs, bots, the weekly sweep|done|
-|2|placement|Belt geometry; commands that put bots into the belt and take them out; placement rules|next|
-|3|timeline|Events by week: hub delivery, hub arrival, ore sale|-|
-|4|money|Ledger, costs, market prices, the game commands|-|
-|5|server|HTTP API, clock, team registration, spectator page|-|
+|1|`sweep.py`|Mining: the weekly sweep along the asteroid stream|done|
+|2|`placement.py`|Belt geometry; `claim`, `land`, `lift`; placement rules|done|
+|3|`timeline.py`|Events by week; `advance` = sweep, then the events of the new week|done|
+|4|`ledger.py`, `market.py`, `game.py`|Money, ore prices, and the player commands `build`, `deploy`, `move`, `ship`|done|
+|5|`reports.py`, `clock.py`|Status, ledger, market, parameters and prospecting views; the clock of a team|done|
+|6|`scenario.py`, `league.py`, `server.py`|Scenario and team files; teams and their clocks; the HTTP API|done|
+|7|-|Admin functions, spectator page, guide page, export of results|next|
 
-The tools in `admin/` and the pages in `templates/` are from the 2018 server. They stay unchanged until the application is complete.
+`world.py` holds the immutable values (`World`, `Asteroid`, `Hub`, `Terms`), and `rejection.py` holds the error for a command that breaks a rule. All modules are in `src/ol_musky/`. Piracy and insurance are not in the game at this time.
 
-**Development** (requires [uv](https://docs.astral.sh/uv/) and Python 3.12)
+**Time.** There is no universal clock and no timer. Each team has its own clock, which starts when the team calls `/mcp/startup`; a team can start again as frequently as it wants. The server calculates the world of the team's current week when a request asks for it.
+
+**Run the server** (requires [uv](https://docs.astral.sh/uv/) and Python 3.12)
 
 ```sh
 uv sync
+uv run ol-musky                 # http://127.0.0.1:8000, interactive API docs at /docs
+curl 'http://127.0.0.1:8000/mcp/startup?token=dev'
+curl 'http://127.0.0.1:8000/mcp/build_hubs?token=dev&hubs=A'
+curl 'http://127.0.0.1:8000/mcp/status_report?token=dev'
+```
+
+The server reads `config/mcp.yaml` (the scenario and its belt file) and `config/teams.yaml` (API token and name of each team) at start. The environment variables `OL_MUSKY_SCENARIO`, `OL_MUSKY_TEAMS`, `OL_MUSKY_HOST` and `OL_MUSKY_PORT` change the files and the address. The state is in memory only.
+
+**Development**
+
+```sh
 uv run pytest
 uv run ruff check . && uv run ruff format --check src tests
 ```

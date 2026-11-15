@@ -10,7 +10,8 @@ from random import Random
 import pytest
 
 from ol_musky import sweep as sweep_module
-from ol_musky.sweep import Asteroid, Hub, World, dig, sweep, weeks
+from ol_musky.sweep import dig, sweep, weeks
+from ol_musky.world import Asteroid, Hub, World
 
 
 def belt(*deposits: int, ore: str = "X") -> tuple[Asteroid, ...]:

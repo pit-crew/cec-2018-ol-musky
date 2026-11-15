@@ -27,4 +27,4 @@ belt:
   cols: 120
   rows: 40
   prospecting_offset: 7
-  file: belt_map-dev.csv
+  file: test1.csv

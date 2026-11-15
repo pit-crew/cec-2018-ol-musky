@@ -7,6 +7,61 @@
 >
 >The name Sid Meier shows up here and there in code because it was in the original name, but, due to licensing, we had to rename it.  Ryerson engineering students will recognize Ol' Musky.
 
+## Redevelopment (2026)
+
+The MCP is being rebuilt on FastAPI, SQLAlchemy and SQLite in `src/ol_musky/`. The Django code (`mcp/`, `admin/`, `templates/`, `src/urls.py`, `src/wsgi.py`) stays in the repository as the reference for the game rules and the wire format; it is not used by the new server. The bot-facing API described below is being kept unchanged.
+
+**Status**
+
+|Sprint|Scope|State|
+|:---:|---|:---:|
+|1|Project skeleton, data layer, scenario loader, `/mcp/parameters`|done|
+|2|Game engine: orders, mining, market, prospecting|next|
+|3|Tick loop and the team endpoints|-|
+|4|Admin endpoints, tracker and guide pages (MVP)|-|
+|5-7|Live spectator UI, hardening, tools and deployment|-|
+
+**Quick start** (requires [uv](https://docs.astral.sh/uv/) and Python 3.12)
+
+```sh
+uv sync
+uv run ol-musky load-scenario   # creates db/ol_musky.sqlite3 from config/mcp.yaml and its belt CSV
+uv run ol-musky serve           # http://127.0.0.1:8000, interactive API docs at /docs
+curl 'http://127.0.0.1:8000/mcp/parameters?token=anything'
+```
+
+**Development**
+
+```sh
+uv run pytest
+uv run ruff check . && uv run ruff format --check src/ol_musky tests
+uv run alembic revision --autogenerate -m "message"   # after a change to src/ol_musky/db/models.py
+```
+
+**Configuration** (environment variables)
+
+|Variable|Default|Purpose|
+|---|---|---|
+|`OL_MUSKY_DB_PATH`|`db/ol_musky.sqlite3`|SQLite database file|
+|`OL_MUSKY_SCENARIO_FILE`|`config/mcp.yaml`|Scenario loaded by `ol-musky load-scenario`|
+|`OL_MUSKY_SCENARIO_ID`|(the only stored scenario)|Scenario to activate at server start|
+
+**Layout**
+
+|Path|Content|
+|---|---|
+|`src/ol_musky/app.py`|FastAPI application factory|
+|`src/ol_musky/api/`|Routers, token check, response envelope|
+|`src/ol_musky/scenario.py`|Scenario model, YAML/CSV loader, active-scenario store|
+|`src/ol_musky/db/`|SQLAlchemy models (same `mcp_*` tables as the Django app), engine, repositories|
+|`src/ol_musky/migrations/`|Alembic migrations|
+|`src/ol_musky/cli.py`|`ol-musky` command: `init-db`, `load-scenario`, `serve`|
+|`tests/`|pytest suite|
+
+`db/db.sqlite3` is a Django development snapshot from February 2018 with an older schema. The new server does not read it.
+
+---
+
 # Canadian Engineering Competition 2018
 
 **Programming Challenge**
@@ -450,3 +505,58 @@ If this is your first time making get requests; checkout the following language 
 |ship_ore|2501|no hubs requested|
 |ship_ore|2502|no ore to ship from hub \<hub\>|
 |ship_ore|2503|not enough money|
+
+
+```plantuml
+@startuml
+
+title Mining Asteroids for Ol' Musky\n
+
+skinparam shadowing false
+
+skinparam note {
+	BorderColor #DarkSlateGrey
+}
+
+skinparam component {
+	Style uml2
+	BorderColor #DarkSlateGrey
+}
+
+:start;
+fork
+    while (time remaining?) is (>0)
+        :get prospect report;
+        :compute sites "scores"\n(weighted 8-sector averages);
+        :sort by score\n -> push to site_queue;
+        :sleep until next report;
+    endwhile (none)
+fork again
+    while (time remaining?) is (<72%)
+        :deploy new hubs from hub_queue\n(build work order done);
+        note right 
+            use sites from site_list
+            then remove
+        endnote
+        :move stale hubs from hub_queue;
+        note right 
+            use sites from site_list
+            then remove
+        endnote
+        :compute max # hubs to\nbuild using avaiable $$$;
+        note right
+            hold back reserve
+            for deploy+ship
+        end note
+        :build hubs\n(push to hub_queue);
+    endwhile(otherwise)
+fork again
+    while (week #?) is (< lifetime-shiptime)
+        :ship hubs from ship_queue;
+        :push all active hubs to ship_queue at\nand 18 weeks past price-rate is max;
+        :enqueue_1 stale hubs\n(out of ore);
+    endwhile(otherwise)
+end fork
+:ship all remaining hubs;
+@enduml
+```

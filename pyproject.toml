@@ -1,0 +1,47 @@
+[project]
+name = "ol-musky"
+version = "0.1.0"
+description = "Ol' Musky asteroid mining game server (CEC 2018 MCP)"
+readme = "README.md"
+authors = [
+    { name = "pit-crew", email = "somebit@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "alembic>=1.20.1",
+    "fastapi>=0.163.0",
+    "jinja2>=3.1.6",
+    "pydantic-settings>=2.16.3",
+    "pyyaml>=6.0.3",
+    "sqlalchemy[asyncio]>=2.1.8",
+    "typer>=0.29.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+ol-musky = "ol_musky.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "ruff>=0.17.5",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["admin", "mcp", "src/urls.py", "src/wsgi.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
